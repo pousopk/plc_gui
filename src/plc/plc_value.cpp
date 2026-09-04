@@ -22,6 +22,22 @@ void writeBigEndianU16(uint8_t* p, int32_t v) {
     p[1] = static_cast<uint8_t>(u & 0xFF);
 }
 
+int32_t readBigEndian32(const uint8_t* p) {
+    uint32_t be = (static_cast<uint32_t>(p[0]) << 24) |
+                  (static_cast<uint32_t>(p[1]) << 16) |
+                  (static_cast<uint32_t>(p[2]) << 8) |
+                   static_cast<uint32_t>(p[3]);
+    return static_cast<int32_t>(be);
+}
+
+void writeBigEndian32(uint8_t* p, int32_t v) {
+    uint32_t u = static_cast<uint32_t>(v);
+    p[0] = static_cast<uint8_t>((u >> 24) & 0xFF);
+    p[1] = static_cast<uint8_t>((u >> 16) & 0xFF);
+    p[2] = static_cast<uint8_t>((u >> 8) & 0xFF);
+    p[3] = static_cast<uint8_t>(u & 0xFF);
+}
+
 float readBigEndianReal(const uint8_t* p) {
     uint32_t be = (static_cast<uint32_t>(p[0]) << 24) |
                   (static_cast<uint32_t>(p[1]) << 16) |
@@ -56,6 +72,8 @@ PlcValue decodePlcValue(PlcType type, const uint8_t* buf, int byteOffset, int bi
             return static_cast<int32_t>(p[0]);
         case PlcType::Real:
             return readBigEndianReal(p);
+        case PlcType::Time:
+            return readBigEndian32(p);
     }
     return false; // unreachable
 }
@@ -81,6 +99,9 @@ void encodePlcValue(PlcType type, PlcValue value, uint8_t* buf, int byteOffset, 
         case PlcType::Real:
             writeBigEndianReal(p, std::get<float>(value));
             break;
+        case PlcType::Time:
+            writeBigEndian32(p, std::get<int32_t>(value));
+            break;
     }
 }
 
@@ -91,6 +112,7 @@ int plcTypeByteSize(PlcType type) {
         case PlcType::Int:   return 2;
         case PlcType::UInt:  return 2;
         case PlcType::Real:  return 4;
+        case PlcType::Time:  return 4;
     }
     return 0;
 }

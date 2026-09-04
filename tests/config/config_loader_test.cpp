@@ -117,6 +117,20 @@ logging: { sinks: [], rules: [] }
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader parses a time tag type") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: timeout, db: 1, type: time, offset: 2, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+    REQUIRE(cfg.tags.size() == 1);
+    CHECK(cfg.tags[0].type == PlcType::Time);
+    std::remove(path.c_str());
+}
+
 TEST_CASE("ConfigLoader rejects an unknown widget type") {
     auto path = writeTempYaml(R"(
 plc: { ip: "1.2.3.4" }

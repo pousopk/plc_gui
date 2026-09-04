@@ -32,6 +32,12 @@ TEST_CASE("decodePlcValue reads a S7 USINT (8-bit unsigned)") {
     CHECK(std::get<int32_t>(v) == 255);
 }
 
+TEST_CASE("decodePlcValue reads a big-endian S7 TIME (32-bit signed milliseconds)") {
+    uint8_t buf[4] = {0x00, 0x00, 0x13, 0x88}; // 5000 ms
+    PlcValue v = decodePlcValue(PlcType::Time, buf, 0, 0);
+    CHECK(std::get<int32_t>(v) == 5000);
+}
+
 TEST_CASE("decodePlcValue reads a specific bit for BOOL") {
     uint8_t buf[1] = {0b00000100}; // bit 2 set
     CHECK(std::get<bool>(decodePlcValue(PlcType::Bool, buf, 0, 2)) == true);
@@ -64,10 +70,17 @@ TEST_CASE("encodePlcValue round-trips UINT and USINT") {
     CHECK(std::get<int32_t>(decodePlcValue(PlcType::USInt, buf, 0, 0)) == 255);
 }
 
+TEST_CASE("encodePlcValue round-trips TIME") {
+    uint8_t buf[4] = {0, 0, 0, 0};
+    encodePlcValue(PlcType::Time, int32_t{5000}, buf, 0, 0);
+    CHECK(std::get<int32_t>(decodePlcValue(PlcType::Time, buf, 0, 0)) == 5000);
+}
+
 TEST_CASE("plcTypeByteSize reports correct sizes for every type") {
     CHECK(plcTypeByteSize(PlcType::Bool) == 1);
     CHECK(plcTypeByteSize(PlcType::USInt) == 1);
     CHECK(plcTypeByteSize(PlcType::Int) == 2);
     CHECK(plcTypeByteSize(PlcType::UInt) == 2);
     CHECK(plcTypeByteSize(PlcType::Real) == 4);
+    CHECK(plcTypeByteSize(PlcType::Time) == 4);
 }

@@ -29,7 +29,8 @@ PlcType parsePlcType(const std::string& s, const std::string& context) {
     if (s == "uint") return PlcType::UInt;
     if (s == "usint") return PlcType::USInt;
     if (s == "real") return PlcType::Real;
-    fail(context, "unknown type '" + s + "' (expected bool|int|uint|usint|real)");
+    if (s == "time") return PlcType::Time;
+    fail(context, "unknown type '" + s + "' (expected bool|int|uint|usint|real|time)");
 }
 
 PlcConnectionConfig parsePlc(const YAML::Node& root) {

@@ -1,0 +1,188 @@
+# DRAFT — do not deploy as-is. Waiting on confirmation from TIA Portal:
+#
+#   1. CAMERA_INSPECTION's instance DB must have "Optimized block access"
+#      unchecked. Optimized blocks have no fixed byte offsets — Snap7
+#      cannot read them at all. If this DB is still optimized, the app
+#      will either fail to connect/read, or (if some other DB happens to
+#      occupy this DB number) silently read the wrong memory.
+#   2. db: 200 is a PLACEHOLDER for one CAMERA_INSPECTION instance DB.
+#      Each camera/station has its own standalone instance DB per your
+#      answer — replace `db: 200` with the real DB number for each one,
+#      and duplicate this whole tags:/panels: block (with a distinct id
+#      prefix and db number) per additional camera.
+#   3. Offsets below are the REFERENCE layout for standard (non-optimized)
+#      access, computed from S7 struct-packing rules: consecutive Bools
+#      pack bit-by-bit into one byte until a non-bool field forces the
+#      byte closed; Time (a 4-byte signed millisecond count) needs even
+#      byte alignment. Confirm these against the real "Offset" column TIA
+#      Portal shows once optimized access is off — don't trust this blindly.
+#
+#      In               Bool   0.0
+#      Reset            Bool   0.1
+#      TriggerSoftware  Bool   0.2
+#      Timeout          Time   2   (4 bytes)
+#      Finished         Bool   6.0
+#      Ok               Bool   6.1
+#      NOk              Bool   6.2
+#      TriggerCam       Bool   6.3
+#      TimeOutError     Bool   6.4
+#      Ready            Bool   6.5
+#      Busy             Bool   6.6
+#      ResetAck         Bool   6.7
+#
+#   4. All widgets below are read-only monitoring (led_indicator / text_display)
+#      per "see them and monitor them" — none of these write back to the PLC.
+#      In/Reset/TriggerSoftware are VAR_INPUT (normally driven by other PLC
+#      logic); if you want to manually trigger them from this GUI instead,
+#      say so and I'll switch those three to toggle/button widgets.
+
+plc:
+  ip: "127.0.0.1"
+  rack: 0
+  slot: 1
+  connect_timeout_ms: 2000
+  reconnect_backoff_ms: [500, 1000, 2000, 5000]
+
+tags:
+  - id: cam1_in
+    db: 200
+    type: bool
+    offset: 0
+    bit: 0
+    update_interval_ms: 200
+  - id: cam1_reset
+    db: 200
+    type: bool
+    offset: 0
+    bit: 1
+    update_interval_ms: 200
+  - id: cam1_trigger_software
+    db: 200
+    type: bool
+    offset: 0
+    bit: 2
+    update_interval_ms: 200
+  - id: cam1_timeout
+    db: 200
+    type: time
+    offset: 2
+    update_interval_ms: 200
+  - id: cam1_finished
+    db: 200
+    type: bool
+    offset: 6
+    bit: 0
+    update_interval_ms: 200
+  - id: cam1_ok
+    db: 200
+    type: bool
+    offset: 6
+    bit: 1
+    update_interval_ms: 200
+  - id: cam1_nok
+    db: 200
+    type: bool
+    offset: 6
+    bit: 2
+    update_interval_ms: 200
+  - id: cam1_trigger_cam
+    db: 200
+    type: bool
+    offset: 6
+    bit: 3
+    update_interval_ms: 200
+  - id: cam1_timeout_error
+    db: 200
+    type: bool
+    offset: 6
+    bit: 4
+    update_interval_ms: 200
+  - id: cam1_ready
+    db: 200
+    type: bool
+    offset: 6
+    bit: 5
+    update_interval_ms: 200
+  - id: cam1_busy
+    db: 200
+    type: bool
+    offset: 6
+    bit: 6
+    update_interval_ms: 200
+  - id: cam1_reset_ack
+    db: 200
+    type: bool
+    offset: 6
+    bit: 7
+    update_interval_ms: 200
+
+panels:
+  - title: "Camera 1 - Inputs"
+    layout: vertical
+    widgets:
+      - type: led_indicator
+        tag: cam1_in
+        label: "In"
+      - type: led_indicator
+        tag: cam1_reset
+        label: "Reset"
+      - type: led_indicator
+        tag: cam1_trigger_software
+        label: "Trigger Software"
+      - type: text_display
+        tag: cam1_timeout
+        label: "Timeout"
+        format: "%.0f ms"
+  - title: "Camera 1 - Outputs"
+    layout: vertical
+    widgets:
+      - type: led_indicator
+        tag: cam1_finished
+        label: "Finished"
+      - type: led_indicator
+        tag: cam1_ok
+        label: "Ok"
+      - type: led_indicator
+        tag: cam1_nok
+        label: "NOk"
+      - type: led_indicator
+        tag: cam1_trigger_cam
+        label: "Trigger Cam"
+      - type: led_indicator
+        tag: cam1_timeout_error
+        label: "Timeout Error"
+      - type: led_indicator
+        tag: cam1_ready
+        label: "Ready"
+      - type: led_indicator
+        tag: cam1_busy
+        label: "Busy"
+      - type: led_indicator
+        tag: cam1_reset_ack
+        label: "Reset Ack"
+
+logging:
+  sinks:
+    - id: csv_main
+      type: csv
+      path: "logs/camera_inspection.csv"
+    - id: sqlite_main
+      type: sqlite
+      path: "logs/camera_inspection.db"
+      table: "camera_inspection"
+  rules:
+    - tags:
+        - cam1_in
+        - cam1_reset
+        - cam1_trigger_software
+        - cam1_timeout
+        - cam1_finished
+        - cam1_ok
+        - cam1_nok
+        - cam1_trigger_cam
+        - cam1_timeout_error
+        - cam1_ready
+        - cam1_busy
+        - cam1_reset_ack
+      interval_ms: 1000
+      sinks: [csv_main, sqlite_main]
