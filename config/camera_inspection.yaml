@@ -39,7 +39,7 @@
 #   DB number, once you have them.
 
 plc:
-  ip: "127.0.0.1"
+  ip: "192.168.1.160"
   rack: 0
   slot: 1
   connect_timeout_ms: 2000
@@ -171,6 +171,16 @@ logging:
       type: sqlite
       path: "logs/camera_inspection.db"
       table: "camera_inspection"
+    # Delete this sink (and its id from rules.sinks below) if you don't
+    # want local CSV/SQLite logging alongside InfluxDB — they're
+    # independent, having all three costs nothing but disk space.
+    - id: influx_main
+      type: influxdb
+      url: "http://localhost:8086"
+      token: "PUT_YOUR_API_TOKEN_HERE"
+      org: "PUT_YOUR_ORG_HERE"
+      bucket: "PUT_YOUR_BUCKET_HERE"
+      measurement: "camera_inspection" # defaults to "plc_readings" if omitted
   rules:
     - tags:
         - cam1_in
@@ -186,4 +196,4 @@ logging:
         - cam1_busy
         - cam1_reset_ack
       interval_ms: 1000
-      sinks: [csv_main, sqlite_main]
+      sinks: [csv_main, sqlite_main, influx_main]

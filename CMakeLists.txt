@@ -57,6 +57,9 @@ include(cmake/snap7.cmake)
 find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)
 
+# --- libcurl (system package) — InfluxDB v2 sink writes over HTTP ---
+find_package(CURL REQUIRED)
+
 set(PLC_GUI_SOURCES
     src/main.cpp
     src/plc/plc_value.cpp
@@ -66,6 +69,7 @@ set(PLC_GUI_SOURCES
     src/plc/plc_io_thread.cpp
     src/logging/csv_log_sink.cpp
     src/logging/sqlite_log_sink.cpp
+    src/logging/influx_log_sink.cpp
     src/logging/log_manager.cpp
     src/ui/widgets/slider_widget.cpp
     src/ui/widgets/input_number_widget.cpp
@@ -84,6 +88,7 @@ target_link_libraries(plc_gui PRIVATE
     imgui
     snap7_static
     SQLite::SQLite3
+    CURL::libcurl
     Threads::Threads
 )
 target_include_directories(plc_gui PRIVATE src)

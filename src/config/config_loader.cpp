@@ -8,7 +8,7 @@ namespace {
 const std::set<std::string> kKnownWidgetTypes = {
     "slider", "input_number", "toggle", "button", "text_display", "led_indicator"
 };
-const std::set<std::string> kKnownSinkTypes = {"csv", "sqlite"};
+const std::set<std::string> kKnownSinkTypes = {"csv", "sqlite", "influxdb"};
 const std::set<std::string> kReservedWidgetKeys = {"type", "tag"};
 
 [[noreturn]] void fail(const std::string& context, const std::string& reason) {
@@ -109,8 +109,17 @@ LoggingConfig parseLogging(const YAML::Node& root) {
             s.id = requireNode(item, "id", ctx).as<std::string>();
             s.type = requireNode(item, "type", ctx).as<std::string>();
             if (!kKnownSinkTypes.count(s.type)) fail(ctx + ".type", "unknown sink type '" + s.type + "'");
-            s.path = requireNode(item, "path", ctx).as<std::string>();
+            if (s.type == "csv" || s.type == "sqlite") {
+                s.path = requireNode(item, "path", ctx).as<std::string>();
+            }
             s.table = item["table"] ? item["table"].as<std::string>() : std::string();
+            if (s.type == "influxdb") {
+                s.url = requireNode(item, "url", ctx).as<std::string>();
+                s.token = requireNode(item, "token", ctx).as<std::string>();
+                s.org = requireNode(item, "org", ctx).as<std::string>();
+                s.bucket = requireNode(item, "bucket", ctx).as<std::string>();
+                s.measurement = item["measurement"] ? item["measurement"].as<std::string>() : std::string("plc_readings");
+            }
             logging.sinks.push_back(std::move(s));
         }
     }

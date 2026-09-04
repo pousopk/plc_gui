@@ -1,5 +1,6 @@
 #include "app/application.hpp"
 #include "logging/csv_log_sink.hpp"
+#include "logging/influx_log_sink.hpp"
 #include "logging/log_manager.hpp"
 #include "logging/sqlite_log_sink.hpp"
 #include "plc/plc_io_thread.hpp"
@@ -33,6 +34,8 @@ std::unordered_map<std::string, std::shared_ptr<ILogSink>> buildSinks(const Logg
             sinks[s.id] = std::make_shared<CsvLogSink>(s.path);
         } else if (s.type == "sqlite") {
             sinks[s.id] = std::make_shared<SqliteLogSink>(s.path, s.table);
+        } else if (s.type == "influxdb") {
+            sinks[s.id] = std::make_shared<InfluxLogSink>(s.url, s.token, s.org, s.bucket, s.measurement);
         }
     }
     return sinks;

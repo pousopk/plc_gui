@@ -36,9 +36,14 @@ struct PanelConfig {
 
 struct LogSinkConfig {
     std::string id;
-    std::string type; // "csv" | "sqlite"
-    std::string path;
+    std::string type; // "csv" | "sqlite" | "influxdb"
+    std::string path;  // csv, sqlite
     std::string table; // sqlite only
+    std::string url;         // influxdb only, e.g. "http://localhost:8086"
+    std::string token;       // influxdb only
+    std::string org;         // influxdb only
+    std::string bucket;      // influxdb only
+    std::string measurement; // influxdb only
 };
 
 struct LogRuleConfig {
