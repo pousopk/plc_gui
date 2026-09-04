@@ -1,21 +1,17 @@
-# DRAFT — do not deploy as-is. Waiting on confirmation from TIA Portal:
+# DRAFT — do not deploy as-is. Still waiting on one confirmation from TIA Portal:
 #
-#   1. CAMERA_INSPECTION's instance DB must have "Optimized block access"
-#      unchecked. Optimized blocks have no fixed byte offsets — Snap7
-#      cannot read them at all. If this DB is still optimized, the app
-#      will either fail to connect/read, or (if some other DB happens to
-#      occupy this DB number) silently read the wrong memory.
-#   2. db: 200 is a PLACEHOLDER for one CAMERA_INSPECTION instance DB.
-#      Each camera/station has its own standalone instance DB per your
-#      answer — replace `db: 200` with the real DB number for each one,
-#      and duplicate this whole tags:/panels: block (with a distinct id
-#      prefix and db number) per additional camera.
-#   3. Offsets below are the REFERENCE layout for standard (non-optimized)
-#      access, computed from S7 struct-packing rules: consecutive Bools
-#      pack bit-by-bit into one byte until a non-bool field forces the
-#      byte closed; Time (a 4-byte signed millisecond count) needs even
-#      byte alignment. Confirm these against the real "Offset" column TIA
-#      Portal shows once optimized access is off — don't trust this blindly.
+#   CAMERA_INSPECTION's instance DB must have "Optimized block access"
+#   unchecked. Optimized blocks have no fixed byte offsets — Snap7 cannot
+#   read them at all. If this DB is still optimized, the app will either
+#   fail to connect/read, or (if some other DB happens to occupy DB1)
+#   silently read the wrong memory.
+#
+#   Offsets below are the REFERENCE layout for standard (non-optimized)
+#   access, computed from S7 struct-packing rules: consecutive Bools pack
+#   bit-by-bit into one byte until a non-bool field forces the byte
+#   closed; Time (a 4-byte signed millisecond count) needs even byte
+#   alignment. Confirm these against the real "Offset" column TIA Portal
+#   shows once optimized access is off — don't trust this blindly.
 #
 #      In               Bool   0.0
 #      Reset            Bool   0.1
@@ -30,11 +26,17 @@
 #      Busy             Bool   6.6
 #      ResetAck         Bool   6.7
 #
-#   4. All widgets below are read-only monitoring (led_indicator / text_display)
-#      per "see them and monitor them" — none of these write back to the PLC.
-#      In/Reset/TriggerSoftware are VAR_INPUT (normally driven by other PLC
-#      logic); if you want to manually trigger them from this GUI instead,
-#      say so and I'll switch those three to toggle/button widgets.
+#   VAR_INPUT (In, Reset, TriggerSoftware, Timeout) are writable: In is a
+#   toggle (assumed to be a held enable/level signal), Reset and
+#   TriggerSoftware are momentary buttons (assumed pulse-triggered, per
+#   their names — writes `true` once per click), Timeout is a numeric
+#   input in milliseconds. VAR_OUTPUT fields are read-only monitoring
+#   (led_indicator/text_display) — the PLC drives these, so nothing here
+#   writes to them.
+#
+#   Multiple camera instances: duplicate this whole tags:/panels: block
+#   with a distinct id prefix (cam2_, cam3_, ...) and that instance's real
+#   DB number, once you have them.
 
 plc:
   ip: "127.0.0.1"
@@ -45,72 +47,72 @@ plc:
 
 tags:
   - id: cam1_in
-    db: 200
+    db: 1
     type: bool
     offset: 0
     bit: 0
     update_interval_ms: 200
   - id: cam1_reset
-    db: 200
+    db: 1
     type: bool
     offset: 0
     bit: 1
     update_interval_ms: 200
   - id: cam1_trigger_software
-    db: 200
+    db: 1
     type: bool
     offset: 0
     bit: 2
     update_interval_ms: 200
   - id: cam1_timeout
-    db: 200
+    db: 1
     type: time
     offset: 2
     update_interval_ms: 200
   - id: cam1_finished
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 0
     update_interval_ms: 200
   - id: cam1_ok
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 1
     update_interval_ms: 200
   - id: cam1_nok
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 2
     update_interval_ms: 200
   - id: cam1_trigger_cam
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 3
     update_interval_ms: 200
   - id: cam1_timeout_error
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 4
     update_interval_ms: 200
   - id: cam1_ready
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 5
     update_interval_ms: 200
   - id: cam1_busy
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 6
     update_interval_ms: 200
   - id: cam1_reset_ack
-    db: 200
+    db: 1
     type: bool
     offset: 6
     bit: 7
@@ -120,19 +122,18 @@ panels:
   - title: "Camera 1 - Inputs"
     layout: vertical
     widgets:
-      - type: led_indicator
+      - type: toggle
         tag: cam1_in
         label: "In"
-      - type: led_indicator
+      - type: button
         tag: cam1_reset
         label: "Reset"
-      - type: led_indicator
+      - type: button
         tag: cam1_trigger_software
         label: "Trigger Software"
-      - type: text_display
+      - type: input_number
         tag: cam1_timeout
-        label: "Timeout"
-        format: "%.0f ms"
+        label: "Timeout (ms)"
   - title: "Camera 1 - Outputs"
     layout: vertical
     widgets:
