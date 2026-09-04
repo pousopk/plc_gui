@@ -60,6 +60,7 @@ find_package(Threads REQUIRED)
 set(PLC_GUI_SOURCES
     src/main.cpp
     src/plc/plc_value.cpp
+    src/config/config_loader.cpp
 )
 
 add_executable(plc_gui ${PLC_GUI_SOURCES})

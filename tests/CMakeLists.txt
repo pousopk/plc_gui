@@ -9,6 +9,8 @@ set(PLC_GUI_TEST_SOURCES
     test_main.cpp
     plc/plc_value_test.cpp
     ${CMAKE_SOURCE_DIR}/src/plc/plc_value.cpp
+    config/config_loader_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/config/config_loader.cpp
 )
 
 add_executable(plc_gui_tests ${PLC_GUI_TEST_SOURCES})
