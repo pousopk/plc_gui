@@ -14,6 +14,8 @@ set(PLC_GUI_TEST_SOURCES
     plc/plc_client_test.cpp
     support/test_plc_server.cpp
     ${CMAKE_SOURCE_DIR}/src/plc/plc_client.cpp
+    plc/poll_group_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/plc/poll_group.cpp
 )
 
 add_executable(plc_gui_tests ${PLC_GUI_TEST_SOURCES})
