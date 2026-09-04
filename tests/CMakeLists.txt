@@ -23,6 +23,8 @@ set(PLC_GUI_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/logging/csv_log_sink.cpp
     logging/sqlite_log_sink_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/sqlite_log_sink.cpp
+    logging/log_manager_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/logging/log_manager.cpp
 )
 
 add_executable(plc_gui_tests ${PLC_GUI_TEST_SOURCES})
