@@ -64,6 +64,7 @@ set(PLC_GUI_SOURCES
     src/plc/plc_client.cpp
     src/plc/poll_group.cpp
     src/plc/plc_io_thread.cpp
+    src/logging/csv_log_sink.cpp
 )
 
 add_executable(plc_gui ${PLC_GUI_SOURCES})
