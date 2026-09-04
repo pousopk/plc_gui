@@ -20,6 +20,18 @@ TEST_CASE("decodePlcValue reads a big-endian S7 INT (16-bit)") {
     CHECK(std::get<int32_t>(v) == 42);
 }
 
+TEST_CASE("decodePlcValue reads a big-endian S7 UINT (16-bit unsigned) without sign extension") {
+    uint8_t buf[2] = {0xC3, 0x50}; // 50000, which would be negative if read as signed Int
+    PlcValue v = decodePlcValue(PlcType::UInt, buf, 0, 0);
+    CHECK(std::get<int32_t>(v) == 50000);
+}
+
+TEST_CASE("decodePlcValue reads a S7 USINT (8-bit unsigned)") {
+    uint8_t buf[1] = {0xFF}; // 255
+    PlcValue v = decodePlcValue(PlcType::USInt, buf, 0, 0);
+    CHECK(std::get<int32_t>(v) == 255);
+}
+
 TEST_CASE("decodePlcValue reads a specific bit for BOOL") {
     uint8_t buf[1] = {0b00000100}; // bit 2 set
     CHECK(std::get<bool>(decodePlcValue(PlcType::Bool, buf, 0, 2)) == true);
@@ -40,4 +52,22 @@ TEST_CASE("encodePlcValue round-trips REAL, INT, BOOL") {
     CHECK(std::get<bool>(decodePlcValue(PlcType::Bool, buf, 0, 3)) == true);
     encodePlcValue(PlcType::Bool, false, buf, 0, 3);
     CHECK(std::get<bool>(decodePlcValue(PlcType::Bool, buf, 0, 3)) == false);
+}
+
+TEST_CASE("encodePlcValue round-trips UINT and USINT") {
+    uint8_t buf[2] = {0, 0};
+
+    encodePlcValue(PlcType::UInt, int32_t{50000}, buf, 0, 0);
+    CHECK(std::get<int32_t>(decodePlcValue(PlcType::UInt, buf, 0, 0)) == 50000);
+
+    encodePlcValue(PlcType::USInt, int32_t{255}, buf, 0, 0);
+    CHECK(std::get<int32_t>(decodePlcValue(PlcType::USInt, buf, 0, 0)) == 255);
+}
+
+TEST_CASE("plcTypeByteSize reports correct sizes for every type") {
+    CHECK(plcTypeByteSize(PlcType::Bool) == 1);
+    CHECK(plcTypeByteSize(PlcType::USInt) == 1);
+    CHECK(plcTypeByteSize(PlcType::Int) == 2);
+    CHECK(plcTypeByteSize(PlcType::UInt) == 2);
+    CHECK(plcTypeByteSize(PlcType::Real) == 4);
 }

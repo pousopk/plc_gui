@@ -1,0 +1,509 @@
+# Example config for the TCP_Socket_Data UDT (see conversation for the
+# TIA Portal struct source). Layout computed from S7 struct alignment
+# rules (byte-sized members pack freely; word/dword-sized members need an
+# even byte offset), cross-checked against the Header_Padding/Data_Padding
+# fields the PLC program already places for exactly that reason:
+#
+#   frame_counter          UInt   @ 0
+#   conditions_length      UInt   @ 2
+#   measurements_length    UInt   @ 4
+#   (Header_Padding        Word   @ 6   -- not exposed, reserved)
+#   global_result          USInt  @ 8
+#   (Data_Padding          Byte   @ 9   -- not exposed, reserved)
+#   class_classification    UInt   @ 10
+#   class_detection          UInt   @ 12
+#   detection_appearances   UInt   @ 14
+#   condition_1..20         USInt  @ 16..35   (1 byte each)
+#   measure_1..20           Real   @ 36..112  (4 bytes each)
+#   Socket_Configuration (TCON_IP_v4) @ 116   -- NOT exposed: PLC-internal
+#     TCP connection descriptor used by the TCON instruction, not process
+#     data. Its exact byte layout isn't modeled here.
+#
+# TODO before use:
+#   - db: 100 is a PLACEHOLDER. Replace with the real DB number.
+#   - This models ONE instance. If multiple instances are packed
+#     back-to-back in the same DB, each instance N>0 needs every offset
+#     above shifted by N * stride, where stride = 116 + sizeof(TCON_IP_v4)
+#     (rounded to the DB's actual per-instance size) — ask for that size
+#     once you have it, rather than guessing TCON_IP_v4's exact layout.
+#   - Condition_1..20 are USInt (0-255), not Bool, so they're rendered as
+#     text_display here rather than led_indicator (which only lights up
+#     for a true Bool tag). If these are really 0/1 flags in practice,
+#     say so and led_indicator can be extended to treat "nonzero" as on.
+
+plc:
+  ip: "127.0.0.1"
+  rack: 0
+  slot: 1
+  connect_timeout_ms: 2000
+  reconnect_backoff_ms: [500, 1000, 2000, 5000]
+
+tags:
+  - id: frame_counter
+    db: 100
+    type: uint
+    offset: 0
+    update_interval_ms: 200
+  - id: conditions_length
+    db: 100
+    type: uint
+    offset: 2
+    update_interval_ms: 200
+  - id: measurements_length
+    db: 100
+    type: uint
+    offset: 4
+    update_interval_ms: 200
+  - id: global_result
+    db: 100
+    type: usint
+    offset: 8
+    update_interval_ms: 200
+  - id: class_classification
+    db: 100
+    type: uint
+    offset: 10
+    update_interval_ms: 200
+  - id: class_detection
+    db: 100
+    type: uint
+    offset: 12
+    update_interval_ms: 200
+  - id: detection_appearances
+    db: 100
+    type: uint
+    offset: 14
+    update_interval_ms: 200
+  - id: condition_1
+    db: 100
+    type: usint
+    offset: 16
+    update_interval_ms: 200
+  - id: condition_2
+    db: 100
+    type: usint
+    offset: 17
+    update_interval_ms: 200
+  - id: condition_3
+    db: 100
+    type: usint
+    offset: 18
+    update_interval_ms: 200
+  - id: condition_4
+    db: 100
+    type: usint
+    offset: 19
+    update_interval_ms: 200
+  - id: condition_5
+    db: 100
+    type: usint
+    offset: 20
+    update_interval_ms: 200
+  - id: condition_6
+    db: 100
+    type: usint
+    offset: 21
+    update_interval_ms: 200
+  - id: condition_7
+    db: 100
+    type: usint
+    offset: 22
+    update_interval_ms: 200
+  - id: condition_8
+    db: 100
+    type: usint
+    offset: 23
+    update_interval_ms: 200
+  - id: condition_9
+    db: 100
+    type: usint
+    offset: 24
+    update_interval_ms: 200
+  - id: condition_10
+    db: 100
+    type: usint
+    offset: 25
+    update_interval_ms: 200
+  - id: condition_11
+    db: 100
+    type: usint
+    offset: 26
+    update_interval_ms: 200
+  - id: condition_12
+    db: 100
+    type: usint
+    offset: 27
+    update_interval_ms: 200
+  - id: condition_13
+    db: 100
+    type: usint
+    offset: 28
+    update_interval_ms: 200
+  - id: condition_14
+    db: 100
+    type: usint
+    offset: 29
+    update_interval_ms: 200
+  - id: condition_15
+    db: 100
+    type: usint
+    offset: 30
+    update_interval_ms: 200
+  - id: condition_16
+    db: 100
+    type: usint
+    offset: 31
+    update_interval_ms: 200
+  - id: condition_17
+    db: 100
+    type: usint
+    offset: 32
+    update_interval_ms: 200
+  - id: condition_18
+    db: 100
+    type: usint
+    offset: 33
+    update_interval_ms: 200
+  - id: condition_19
+    db: 100
+    type: usint
+    offset: 34
+    update_interval_ms: 200
+  - id: condition_20
+    db: 100
+    type: usint
+    offset: 35
+    update_interval_ms: 200
+  - id: measure_1
+    db: 100
+    type: real
+    offset: 36
+    update_interval_ms: 200
+  - id: measure_2
+    db: 100
+    type: real
+    offset: 40
+    update_interval_ms: 200
+  - id: measure_3
+    db: 100
+    type: real
+    offset: 44
+    update_interval_ms: 200
+  - id: measure_4
+    db: 100
+    type: real
+    offset: 48
+    update_interval_ms: 200
+  - id: measure_5
+    db: 100
+    type: real
+    offset: 52
+    update_interval_ms: 200
+  - id: measure_6
+    db: 100
+    type: real
+    offset: 56
+    update_interval_ms: 200
+  - id: measure_7
+    db: 100
+    type: real
+    offset: 60
+    update_interval_ms: 200
+  - id: measure_8
+    db: 100
+    type: real
+    offset: 64
+    update_interval_ms: 200
+  - id: measure_9
+    db: 100
+    type: real
+    offset: 68
+    update_interval_ms: 200
+  - id: measure_10
+    db: 100
+    type: real
+    offset: 72
+    update_interval_ms: 200
+  - id: measure_11
+    db: 100
+    type: real
+    offset: 76
+    update_interval_ms: 200
+  - id: measure_12
+    db: 100
+    type: real
+    offset: 80
+    update_interval_ms: 200
+  - id: measure_13
+    db: 100
+    type: real
+    offset: 84
+    update_interval_ms: 200
+  - id: measure_14
+    db: 100
+    type: real
+    offset: 88
+    update_interval_ms: 200
+  - id: measure_15
+    db: 100
+    type: real
+    offset: 92
+    update_interval_ms: 200
+  - id: measure_16
+    db: 100
+    type: real
+    offset: 96
+    update_interval_ms: 200
+  - id: measure_17
+    db: 100
+    type: real
+    offset: 100
+    update_interval_ms: 200
+  - id: measure_18
+    db: 100
+    type: real
+    offset: 104
+    update_interval_ms: 200
+  - id: measure_19
+    db: 100
+    type: real
+    offset: 108
+    update_interval_ms: 200
+  - id: measure_20
+    db: 100
+    type: real
+    offset: 112
+    update_interval_ms: 200
+
+panels:
+  - title: "Socket Header"
+    layout: vertical
+    widgets:
+      - type: text_display
+        tag: frame_counter
+        label: "Frame Counter"
+      - type: text_display
+        tag: conditions_length
+        label: "Conditions Length"
+      - type: text_display
+        tag: measurements_length
+        label: "Measurements Length"
+      - type: text_display
+        tag: global_result
+        label: "Global Result"
+      - type: text_display
+        tag: class_classification
+        label: "Class Classification"
+      - type: text_display
+        tag: class_detection
+        label: "Class Detection"
+      - type: text_display
+        tag: detection_appearances
+        label: "Detection Appearances"
+  - title: "Conditions"
+    layout: vertical
+    widgets:
+      - type: text_display
+        tag: condition_1
+        label: "Condition 1"
+      - type: text_display
+        tag: condition_2
+        label: "Condition 2"
+      - type: text_display
+        tag: condition_3
+        label: "Condition 3"
+      - type: text_display
+        tag: condition_4
+        label: "Condition 4"
+      - type: text_display
+        tag: condition_5
+        label: "Condition 5"
+      - type: text_display
+        tag: condition_6
+        label: "Condition 6"
+      - type: text_display
+        tag: condition_7
+        label: "Condition 7"
+      - type: text_display
+        tag: condition_8
+        label: "Condition 8"
+      - type: text_display
+        tag: condition_9
+        label: "Condition 9"
+      - type: text_display
+        tag: condition_10
+        label: "Condition 10"
+      - type: text_display
+        tag: condition_11
+        label: "Condition 11"
+      - type: text_display
+        tag: condition_12
+        label: "Condition 12"
+      - type: text_display
+        tag: condition_13
+        label: "Condition 13"
+      - type: text_display
+        tag: condition_14
+        label: "Condition 14"
+      - type: text_display
+        tag: condition_15
+        label: "Condition 15"
+      - type: text_display
+        tag: condition_16
+        label: "Condition 16"
+      - type: text_display
+        tag: condition_17
+        label: "Condition 17"
+      - type: text_display
+        tag: condition_18
+        label: "Condition 18"
+      - type: text_display
+        tag: condition_19
+        label: "Condition 19"
+      - type: text_display
+        tag: condition_20
+        label: "Condition 20"
+  - title: "Measurements"
+    layout: vertical
+    widgets:
+      - type: text_display
+        tag: measure_1
+        label: "Measure 1"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_2
+        label: "Measure 2"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_3
+        label: "Measure 3"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_4
+        label: "Measure 4"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_5
+        label: "Measure 5"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_6
+        label: "Measure 6"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_7
+        label: "Measure 7"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_8
+        label: "Measure 8"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_9
+        label: "Measure 9"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_10
+        label: "Measure 10"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_11
+        label: "Measure 11"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_12
+        label: "Measure 12"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_13
+        label: "Measure 13"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_14
+        label: "Measure 14"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_15
+        label: "Measure 15"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_16
+        label: "Measure 16"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_17
+        label: "Measure 17"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_18
+        label: "Measure 18"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_19
+        label: "Measure 19"
+        format: "%.3f"
+      - type: text_display
+        tag: measure_20
+        label: "Measure 20"
+        format: "%.3f"
+
+logging:
+  sinks:
+    - id: csv_main
+      type: csv
+      path: "logs/tcp_socket_data.csv"
+    - id: sqlite_main
+      type: sqlite
+      path: "logs/tcp_socket_data.db"
+      table: "tcp_socket_data"
+  rules:
+    - tags:
+        - frame_counter
+        - conditions_length
+        - measurements_length
+        - global_result
+        - class_classification
+        - class_detection
+        - detection_appearances
+        - condition_1
+        - condition_2
+        - condition_3
+        - condition_4
+        - condition_5
+        - condition_6
+        - condition_7
+        - condition_8
+        - condition_9
+        - condition_10
+        - condition_11
+        - condition_12
+        - condition_13
+        - condition_14
+        - condition_15
+        - condition_16
+        - condition_17
+        - condition_18
+        - condition_19
+        - condition_20
+        - measure_1
+        - measure_2
+        - measure_3
+        - measure_4
+        - measure_5
+        - measure_6
+        - measure_7
+        - measure_8
+        - measure_9
+        - measure_10
+        - measure_11
+        - measure_12
+        - measure_13
+        - measure_14
+        - measure_15
+        - measure_16
+        - measure_17
+        - measure_18
+        - measure_19
+        - measure_20
+      interval_ms: 1000
+      sinks: [csv_main, sqlite_main]

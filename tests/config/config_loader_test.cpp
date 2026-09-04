@@ -101,6 +101,22 @@ logging:
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader parses uint and usint tag types") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: frame_counter, db: 1, type: uint, offset: 0, update_interval_ms: 100 }
+  - { id: global_result, db: 1, type: usint, offset: 8, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+    REQUIRE(cfg.tags.size() == 2);
+    CHECK(cfg.tags[0].type == PlcType::UInt);
+    CHECK(cfg.tags[1].type == PlcType::USInt);
+    std::remove(path.c_str());
+}
+
 TEST_CASE("ConfigLoader rejects an unknown widget type") {
     auto path = writeTempYaml(R"(
 plc: { ip: "1.2.3.4" }

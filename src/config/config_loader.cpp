@@ -26,8 +26,10 @@ YAML::Node requireNode(const YAML::Node& parent, const std::string& key, const s
 PlcType parsePlcType(const std::string& s, const std::string& context) {
     if (s == "bool") return PlcType::Bool;
     if (s == "int") return PlcType::Int;
+    if (s == "uint") return PlcType::UInt;
+    if (s == "usint") return PlcType::USInt;
     if (s == "real") return PlcType::Real;
-    fail(context, "unknown type '" + s + "' (expected bool|int|real)");
+    fail(context, "unknown type '" + s + "' (expected bool|int|uint|usint|real)");
 }
 
 PlcConnectionConfig parsePlc(const YAML::Node& root) {
