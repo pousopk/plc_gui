@@ -59,6 +59,7 @@ std::vector<TagConfig> parseTags(const YAML::Node& root) {
         t.offset = requireNode(item, "offset", ctx).as<int>();
         t.bit = item["bit"] ? item["bit"].as<int>() : 0;
         t.updateIntervalMs = requireNode(item, "update_interval_ms", ctx).as<int>();
+        t.label = item["label"] ? item["label"].as<std::string>() : std::string();
         tags.push_back(std::move(t));
     }
     return tags;

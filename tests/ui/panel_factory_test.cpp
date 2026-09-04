@@ -1,15 +1,17 @@
 #include <doctest/doctest.h>
 #include "ui/panel_factory.hpp"
+#include "ui/widgets/led_indicator_widget.hpp"
 #include "ui/widgets/slider_widget.hpp"
 
 namespace {
-TagConfig makeTag(std::string id, PlcType type) {
+TagConfig makeTag(std::string id, PlcType type, std::string label = "") {
     TagConfig t;
     t.id = std::move(id);
     t.db = 1;
     t.type = type;
     t.offset = 0;
     t.updateIntervalMs = 100;
+    t.label = std::move(label);
     return t;
 }
 } // namespace
@@ -45,6 +47,37 @@ TEST_CASE("PanelFactory builds widgets bound to the correct tag ids and params")
     CHECK(sliderWidget->minValue() == doctest::Approx(0.0f));
     CHECK(sliderWidget->maxValue() == doctest::Approx(3000.0f));
     CHECK(sliderWidget->label() == "Speed");
+}
+
+TEST_CASE("A widget's caption defaults to the tag's label, but its own label param still wins") {
+    std::vector<TagConfig> tags = {
+        makeTag("cam1_finished", PlcType::Bool, "Finished"), // has a tag-level label
+        makeTag("cam1_ok", PlcType::Bool, "Ok"),              // has a tag-level label, overridden below
+    };
+
+    PanelConfig panel;
+    panel.title = "Outputs";
+
+    WidgetConfig noOwnLabel;
+    noOwnLabel.type = "led_indicator";
+    noOwnLabel.tag = "cam1_finished"; // no "label" param -> falls back to tag.label
+
+    WidgetConfig ownLabel;
+    ownLabel.type = "led_indicator";
+    ownLabel.tag = "cam1_ok";
+    ownLabel.params = {{"label", "Custom Ok Caption"}}; // widget's own label wins
+
+    panel.widgets = {noOwnLabel, ownLabel};
+
+    auto panels = PanelFactory::build({panel}, tags);
+
+    REQUIRE(panels[0].widgets.size() == 2);
+    auto* w0 = dynamic_cast<LedIndicatorWidget*>(panels[0].widgets[0].get());
+    auto* w1 = dynamic_cast<LedIndicatorWidget*>(panels[0].widgets[1].get());
+    REQUIRE(w0 != nullptr);
+    REQUIRE(w1 != nullptr);
+    CHECK(w0->label() == "Finished");
+    CHECK(w1->label() == "Custom Ok Caption");
 }
 
 TEST_CASE("PanelFactory throws when a widget references a tag not in the tag list") {

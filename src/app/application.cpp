@@ -41,6 +41,14 @@ std::unordered_map<std::string, std::shared_ptr<ILogSink>> buildSinks(const Logg
     return sinks;
 }
 
+std::unordered_map<std::string, std::string> buildTagLabels(const std::vector<TagConfig>& tags) {
+    std::unordered_map<std::string, std::string> labels;
+    for (const auto& t : tags) {
+        if (!t.label.empty()) labels[t.id] = t.label;
+    }
+    return labels;
+}
+
 } // namespace
 
 Application::Application(AppConfig config, bool headless)
@@ -49,7 +57,7 @@ Application::Application(AppConfig config, bool headless)
 int Application::run() {
     ValueCache cache;
     PlcIoThread io(config_.plc, config_.tags, cache);
-    LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache);
+    LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache, buildTagLabels(config_.tags));
 
     io.start();
     logManager.start();

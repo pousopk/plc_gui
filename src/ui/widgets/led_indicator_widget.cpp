@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 LedIndicatorWidget::LedIndicatorWidget(const WidgetConfig& cfg, const TagConfig& tag)
-    : WidgetBase(tag.id), label_(getParam(cfg, "label", tag.id)) {}
+    : WidgetBase(tag.id), label_(getParam(cfg, "label", defaultLabel(tag))) {}
 
 void LedIndicatorWidget::render(const ValueMap& snapshot, PlcIoThread&) {
     auto it = snapshot.find(tagId_);

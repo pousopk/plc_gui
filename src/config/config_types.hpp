@@ -20,6 +20,11 @@ struct TagConfig {
     int offset = 0;
     int bit = 0; // only meaningful for PlcType::Bool
     int updateIntervalMs = 1000;
+    std::string label; // optional human-friendly name; empty means "use id".
+                        // Used as the tag_id sent to every logging sink
+                        // (CSV/SQLite/InfluxDB) and as the default widget
+                        // caption, so a display name only has to be typed
+                        // once per tag rather than once per widget/sink.
 };
 
 struct WidgetConfig {

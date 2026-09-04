@@ -14,7 +14,7 @@ double asDouble(const PlcValue& v) {
 } // namespace
 
 TextDisplayWidget::TextDisplayWidget(const WidgetConfig& cfg, const TagConfig& tag)
-    : WidgetBase(tag.id), label_(getParam(cfg, "label", tag.id)), format_(getParam(cfg, "format", "%.2f")) {}
+    : WidgetBase(tag.id), label_(getParam(cfg, "label", defaultLabel(tag))), format_(getParam(cfg, "format", "%.2f")) {}
 
 void TextDisplayWidget::render(const ValueMap& snapshot, PlcIoThread&) {
     auto it = snapshot.find(tagId_);

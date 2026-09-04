@@ -52,71 +52,83 @@ tags:
     offset: 0
     bit: 0
     update_interval_ms: 200
+    label: "In"
   - id: cam1_reset
     db: 1
     type: bool
     offset: 0
     bit: 1
     update_interval_ms: 200
+    label: "Reset"
   - id: cam1_trigger_software
     db: 1
     type: bool
     offset: 0
     bit: 2
     update_interval_ms: 200
+    label: "Trigger Software"
   - id: cam1_timeout
     db: 1
     type: time
     offset: 2
     update_interval_ms: 200
+    label: "Timeout"
   - id: cam1_finished
     db: 1
     type: bool
     offset: 6
     bit: 0
     update_interval_ms: 200
+    label: "Finished"
   - id: cam1_ok
     db: 1
     type: bool
     offset: 6
     bit: 1
     update_interval_ms: 200
+    label: "Ok"
   - id: cam1_nok
     db: 1
     type: bool
     offset: 6
     bit: 2
     update_interval_ms: 200
+    label: "NOk"
   - id: cam1_trigger_cam
     db: 1
     type: bool
     offset: 6
     bit: 3
     update_interval_ms: 200
+    label: "Trigger Cam"
   - id: cam1_timeout_error
     db: 1
     type: bool
     offset: 6
     bit: 4
     update_interval_ms: 200
+    label: "Timeout Error"
   - id: cam1_ready
     db: 1
     type: bool
     offset: 6
     bit: 5
     update_interval_ms: 200
+    label: "Ready"
   - id: cam1_busy
     db: 1
     type: bool
     offset: 6
     bit: 6
     update_interval_ms: 200
+    label: "Busy"
   - id: cam1_reset_ack
     db: 1
     type: bool
     offset: 6
     bit: 7
     update_interval_ms: 200
+    label: "Reset Ack"
 
 panels:
   - title: "Camera 1 - Inputs"
@@ -177,9 +189,9 @@ logging:
     - id: influx_main
       type: influxdb
       url: "http://localhost:8086"
-      token: "PUT_YOUR_API_TOKEN_HERE"
-      org: "PUT_YOUR_ORG_HERE"
-      bucket: "PUT_YOUR_BUCKET_HERE"
+      token: "6-9PzoTOfoUQRBLV8PK2BANsjZTCuoe2ppfNWDVUik3wO5dco1LqOlElAmxfv13GhIsy0fJtRraQdmH0NTRhEQ=="
+      org: "logicmelt"
+      bucket: "PLC"
       measurement: "camera_inspection" # defaults to "plc_readings" if omitted
   rules:
     - tags:

@@ -23,3 +23,11 @@ inline std::string getParam(const WidgetConfig& cfg, const std::string& key, con
     auto it = cfg.params.find(key);
     return it != cfg.params.end() ? it->second : def;
 }
+
+// A widget's caption defaults to the tag's own label (if the tag has one)
+// rather than its raw id, so a display name only needs to be set once per
+// tag instead of once per widget. A widget's own `label` param, if present,
+// still wins over both.
+inline std::string defaultLabel(const TagConfig& tag) {
+    return tag.label.empty() ? tag.id : tag.label;
+}

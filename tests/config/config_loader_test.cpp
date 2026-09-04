@@ -101,6 +101,22 @@ logging:
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader parses an optional tag label, defaulting to empty when omitted") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: cam1_finished, db: 1, type: bool, offset: 6, bit: 0, update_interval_ms: 100, label: "Finished" }
+  - { id: cam1_ok, db: 1, type: bool, offset: 6, bit: 1, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+    REQUIRE(cfg.tags.size() == 2);
+    CHECK(cfg.tags[0].label == "Finished");
+    CHECK(cfg.tags[1].label == "");
+    std::remove(path.c_str());
+}
+
 TEST_CASE("ConfigLoader parses uint and usint tag types") {
     auto path = writeTempYaml(R"YAML(
 plc: { ip: "1.2.3.4" }

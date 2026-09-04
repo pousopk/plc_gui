@@ -94,6 +94,30 @@ TEST_CASE("LogManager dispatches current cache values to configured sinks on sch
     CHECK(row[1].stale == true);
 }
 
+TEST_CASE("LogManager dispatches under the tag's label when one is configured, falling back to id otherwise") {
+    ValueCache cache;
+    cache.publish(makeSnapshot());
+    auto sink = std::make_shared<FakeLogSink>();
+
+    LogRuleConfig rule;
+    rule.tags = {"tag1", "tag2"};
+    rule.intervalMs = 20;
+    rule.sinks = {"s1"};
+
+    std::unordered_map<std::string, std::string> tagLabels = {{"tag1", "Finished"}};
+
+    LogManager mgr({rule}, {{"s1", sink}}, cache, tagLabels);
+    mgr.start();
+
+    REQUIRE(waitUntil([&] { return sink->rowCount() >= 1; }, 500));
+    mgr.stop();
+
+    auto row = sink->rows.front();
+    REQUIRE(row.size() == 2);
+    CHECK(row[0].tagId == "Finished"); // tag1 has a label -> used instead of the raw id
+    CHECK(row[1].tagId == "tag2");     // tag2 has no label -> falls back to its raw id
+}
+
 TEST_CASE("LogManager keeps running and keeps logging to other sinks after one sink throws") {
     ValueCache cache;
     cache.publish(makeSnapshot());

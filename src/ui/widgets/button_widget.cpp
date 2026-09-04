@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 ButtonWidget::ButtonWidget(const WidgetConfig& cfg, const TagConfig& tag)
-    : WidgetBase(tag.id), label_(getParam(cfg, "label", tag.id)) {}
+    : WidgetBase(tag.id), label_(getParam(cfg, "label", defaultLabel(tag))) {}
 
 void ButtonWidget::render(const ValueMap& snapshot, PlcIoThread& io) {
     bool stale = snapshot.count(tagId_) == 0 || snapshot.at(tagId_).stale;
