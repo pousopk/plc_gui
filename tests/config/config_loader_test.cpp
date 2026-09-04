@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include "config/config_loader.hpp"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -347,5 +348,252 @@ panels:
 logging: { sinks: [], rules: [] }
 )");
     CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+namespace {
+const char* kDeviceBlueprintConfig = R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+device_types:
+  camera_inspection:
+    update_interval_ms: 200
+    fields:
+      - id: in
+        type: bool
+        offset: 0
+        bit: 0
+        label: "In"
+        writable: true
+        widget: toggle
+        group: "Inputs"
+      - id: timeout
+        type: time
+        offset: 2
+        label: "Timeout (ms)"
+        writable: true
+        widget: input_number
+        group: "Inputs"
+      - id: finished
+        type: bool
+        offset: 6
+        bit: 0
+        label: "Finished"
+        widget: led_indicator
+        group: "Outputs"
+      - id: ready
+        type: bool
+        offset: 6
+        bit: 1
+        label: "Ready"
+        widget: led_indicator
+        group: "Outputs"
+devices:
+  - type: camera_inspection
+    id: cam1
+    db: 1
+    label: "Camera 1"
+  - type: camera_inspection
+    id: cam2
+    db: 3
+    label: "Camera 2"
+logging:
+  sinks: []
+  rules:
+    - devices: [cam1, cam2]
+      interval_ms: 1000
+      sinks: []
+)YAML";
+} // namespace
+
+TEST_CASE("ConfigLoader expands device_types + devices into tags with correct fields per instance") {
+    auto path = writeTempYaml(kDeviceBlueprintConfig);
+    AppConfig cfg = ConfigLoader::load(path);
+
+    REQUIRE(cfg.tags.size() == 8); // 4 fields x 2 devices
+    auto find = [&](const std::string& id) -> const TagConfig* {
+        for (const auto& t : cfg.tags) if (t.id == id) return &t;
+        return nullptr;
+    };
+
+    const TagConfig* cam1In = find("cam1_in");
+    REQUIRE(cam1In != nullptr);
+    CHECK(cam1In->db == 1);
+    CHECK(cam1In->type == PlcType::Bool);
+    CHECK(cam1In->offset == 0);
+    CHECK(cam1In->bit == 0);
+    CHECK(cam1In->label == "In");
+    CHECK(cam1In->device == "Camera 1");
+    CHECK(cam1In->updateIntervalMs == 200);
+
+    const TagConfig* cam2Timeout = find("cam2_timeout");
+    REQUIRE(cam2Timeout != nullptr);
+    CHECK(cam2Timeout->db == 3);
+    CHECK(cam2Timeout->type == PlcType::Time);
+    CHECK(cam2Timeout->offset == 2);
+    CHECK(cam2Timeout->device == "Camera 2");
+
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader generates one panel per device with fields grouped by their blueprint group") {
+    auto path = writeTempYaml(kDeviceBlueprintConfig);
+    AppConfig cfg = ConfigLoader::load(path);
+
+    REQUIRE(cfg.panels.size() == 2);
+    CHECK(cfg.panels[0].title == "Camera 1");
+    CHECK(cfg.panels[1].title == "Camera 2");
+
+    REQUIRE(cfg.panels[0].groups.size() == 2);
+    CHECK(cfg.panels[0].groups[0].title == "Inputs");
+    REQUIRE(cfg.panels[0].groups[0].widgets.size() == 2);
+    CHECK(cfg.panels[0].groups[0].widgets[0].type == "toggle");
+    CHECK(cfg.panels[0].groups[0].widgets[0].tag == "cam1_in");
+    CHECK(cfg.panels[0].groups[1].title == "Outputs");
+    REQUIRE(cfg.panels[0].groups[1].widgets.size() == 2);
+    CHECK(cfg.panels[0].groups[1].widgets[0].type == "led_indicator");
+    CHECK(cfg.panels[0].groups[1].widgets[0].tag == "cam1_finished");
+
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader expands a logging rule's devices list into every field of every listed device") {
+    auto path = writeTempYaml(kDeviceBlueprintConfig);
+    AppConfig cfg = ConfigLoader::load(path);
+
+    REQUIRE(cfg.logging.rules.size() == 1);
+    const auto& tags = cfg.logging.rules[0].tags;
+    CHECK(tags.size() == 8);
+    CHECK(std::find(tags.begin(), tags.end(), "cam1_in") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam1_timeout") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam1_finished") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam1_ready") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam2_in") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam2_timeout") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam2_finished") != tags.end());
+    CHECK(std::find(tags.begin(), tags.end(), "cam2_ready") != tags.end());
+
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects a device instance referencing an unknown device type") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+devices:
+  - type: does_not_exist
+    id: cam1
+    db: 1
+    label: "Camera 1"
+logging: { sinks: [], rules: [] }
+)YAML");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects two devices sharing the same id") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+device_types:
+  camera_inspection:
+    update_interval_ms: 200
+    fields:
+      - { id: in, type: bool, offset: 0, bit: 0, label: "In", widget: led_indicator, group: "Outputs" }
+devices:
+  - { type: camera_inspection, id: cam1, db: 1, label: "Camera 1" }
+  - { type: camera_inspection, id: cam1, db: 3, label: "Camera 2 (oops, forgot to rename id)" }
+logging: { sinks: [], rules: [] }
+)YAML");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects a logging rule's devices list referencing an unknown device id") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+device_types:
+  camera_inspection:
+    update_interval_ms: 200
+    fields:
+      - { id: in, type: bool, offset: 0, bit: 0, label: "In", widget: led_indicator, group: "Outputs" }
+devices:
+  - { type: camera_inspection, id: cam1, db: 1, label: "Camera 1" }
+logging:
+  sinks: []
+  rules:
+    - devices: [does_not_exist]
+      interval_ms: 1000
+      sinks: []
+)YAML");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects a writable:true field using a read-only widget") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+device_types:
+  camera_inspection:
+    update_interval_ms: 200
+    fields:
+      - { id: in, type: bool, offset: 0, bit: 0, label: "In", writable: true, widget: led_indicator, group: "Inputs" }
+devices: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects a writable widget without writable:true") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+device_types:
+  camera_inspection:
+    update_interval_ms: 200
+    fields:
+      - { id: in, type: bool, offset: 0, bit: 0, label: "In", widget: toggle, group: "Inputs" }
+devices: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader lets device blueprints coexist with directly-specified tags and panels") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: manual_tag, db: 9, type: int, offset: 0, update_interval_ms: 500 }
+panels:
+  - title: "Manual Panel"
+    layout: vertical
+    widgets:
+      - { type: text_display, tag: manual_tag }
+device_types:
+  camera_inspection:
+    update_interval_ms: 200
+    fields:
+      - { id: in, type: bool, offset: 0, bit: 0, label: "In", widget: led_indicator, group: "Inputs" }
+devices:
+  - { type: camera_inspection, id: cam1, db: 1, label: "Camera 1" }
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+
+    REQUIRE(cfg.tags.size() == 2);
+    REQUIRE(cfg.panels.size() == 2);
+    CHECK(cfg.panels[0].title == "Manual Panel");
+    CHECK(cfg.panels[1].title == "Camera 1");
+
     std::remove(path.c_str());
 }
