@@ -11,6 +11,9 @@ set(PLC_GUI_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/plc/plc_value.cpp
     config/config_loader_test.cpp
     ${CMAKE_SOURCE_DIR}/src/config/config_loader.cpp
+    plc/plc_client_test.cpp
+    support/test_plc_server.cpp
+    ${CMAKE_SOURCE_DIR}/src/plc/plc_client.cpp
 )
 
 add_executable(plc_gui_tests ${PLC_GUI_TEST_SOURCES})
@@ -21,5 +24,5 @@ target_link_libraries(plc_gui_tests PRIVATE
     SQLite::SQLite3
     Threads::Threads
 )
-target_include_directories(plc_gui_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(plc_gui_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 add_test(NAME plc_gui_tests COMMAND plc_gui_tests)
