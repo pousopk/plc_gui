@@ -118,6 +118,31 @@ TEST_CASE("LogManager dispatches under the tag's label when one is configured, f
     CHECK(row[1].tagId == "tag2");     // tag2 has no label -> falls back to its raw id
 }
 
+TEST_CASE("LogManager sets LogValue::device when configured, leaving it empty otherwise") {
+    ValueCache cache;
+    cache.publish(makeSnapshot());
+    auto sink = std::make_shared<FakeLogSink>();
+
+    LogRuleConfig rule;
+    rule.tags = {"tag1", "tag2"};
+    rule.intervalMs = 20;
+    rule.sinks = {"s1"};
+
+    std::unordered_map<std::string, std::string> tagLabels = {};
+    std::unordered_map<std::string, std::string> tagDevices = {{"tag1", "Camera 1"}};
+
+    LogManager mgr({rule}, {{"s1", sink}}, cache, tagLabels, tagDevices);
+    mgr.start();
+
+    REQUIRE(waitUntil([&] { return sink->rowCount() >= 1; }, 500));
+    mgr.stop();
+
+    auto row = sink->rows.front();
+    REQUIRE(row.size() == 2);
+    CHECK(row[0].device == "Camera 1");
+    CHECK(row[1].device == "");
+}
+
 TEST_CASE("LogManager keeps running and keeps logging to other sinks after one sink throws") {
     ValueCache cache;
     cache.publish(makeSnapshot());

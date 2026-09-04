@@ -49,6 +49,14 @@ std::unordered_map<std::string, std::string> buildTagLabels(const std::vector<Ta
     return labels;
 }
 
+std::unordered_map<std::string, std::string> buildTagDevices(const std::vector<TagConfig>& tags) {
+    std::unordered_map<std::string, std::string> devices;
+    for (const auto& t : tags) {
+        if (!t.device.empty()) devices[t.id] = t.device;
+    }
+    return devices;
+}
+
 } // namespace
 
 Application::Application(AppConfig config, bool headless)
@@ -57,7 +65,8 @@ Application::Application(AppConfig config, bool headless)
 int Application::run() {
     ValueCache cache;
     PlcIoThread io(config_.plc, config_.tags, cache);
-    LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache, buildTagLabels(config_.tags));
+    LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache,
+                           buildTagLabels(config_.tags), buildTagDevices(config_.tags));
 
     io.start();
     logManager.start();

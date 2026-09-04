@@ -30,7 +30,12 @@ std::string buildInfluxLineProtocol(const std::string& measurement,
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(ts.time_since_epoch()).count();
     std::ostringstream out;
     for (const auto& v : values) {
-        out << measurement << ",tag_id=" << escapeTag(v.tagId) << " ";
+        out << measurement << ",tag_id=" << escapeTag(v.tagId);
+        // A real Influx tag (not a field), so two devices sharing a
+        // per-signal label (e.g. two cameras both having a "Finished"
+        // signal) land in separate time series instead of colliding.
+        if (!v.device.empty()) out << ",device=" << escapeTag(v.device);
+        out << " ";
         // InfluxDB enforces one type per field name *per measurement* (not
         // per series), so tags of different PlcValue types can't all share
         // a "value" field — a bool-typed tag and an int-typed tag in the

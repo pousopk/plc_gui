@@ -41,6 +41,22 @@ TEST_CASE("buildInfluxLineProtocol never uses the same field name for different 
     CHECK(line.find(" value=") == std::string::npos); // the old, colliding field name must be gone
 }
 
+TEST_CASE("buildInfluxLineProtocol emits device as a real tag when set, and omits it when empty") {
+    // Two devices sharing a signal label (e.g. two cameras both having a
+    // "Finished" tag_id) must not collide into the same series — the
+    // device tag is what keeps them apart.
+    auto ts = std::chrono::system_clock::time_point(std::chrono::milliseconds(1000));
+    std::vector<LogValue> withDevice = {{"Finished", true, false, "Camera 1"}};
+    std::vector<LogValue> withoutDevice = {{"Finished", true, false}};
+
+    std::string lineWith = buildInfluxLineProtocol("m", ts, withDevice);
+    std::string lineWithout = buildInfluxLineProtocol("m", ts, withoutDevice);
+
+    CHECK(lineWith.find("m,tag_id=Finished,device=Camera\\ 1 value_bool=true,stale=false 1000\n") != std::string::npos);
+    CHECK(lineWithout.find("m,tag_id=Finished value_bool=true,stale=false 1000\n") != std::string::npos);
+    CHECK(lineWithout.find("device=") == std::string::npos);
+}
+
 TEST_CASE("buildInfluxLineProtocol escapes spaces, commas, and equals signs in tag_id") {
     auto ts = std::chrono::system_clock::time_point(std::chrono::milliseconds(1000));
     std::vector<LogValue> values = {{"a b,c=d", int32_t{1}, false}};

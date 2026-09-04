@@ -15,11 +15,15 @@ class LogManager {
 public:
     // tagLabels maps tag id -> display name, for tags whose config gave
     // them a `label` (an id absent from this map just logs under its own
-    // id). Defaults to empty so existing call sites need no changes.
+    // id). tagDevices maps tag id -> device name, for tags whose config
+    // gave them a `device` (passed through to LogValue::device, currently
+    // only consumed by InfluxLogSink). Both default to empty so existing
+    // call sites need no changes.
     LogManager(std::vector<LogRuleConfig> rules,
                std::unordered_map<std::string, std::shared_ptr<ILogSink>> sinksById,
                const ValueCache& cache,
-               std::unordered_map<std::string, std::string> tagLabels = {});
+               std::unordered_map<std::string, std::string> tagLabels = {},
+               std::unordered_map<std::string, std::string> tagDevices = {});
     ~LogManager();
     LogManager(const LogManager&) = delete;
     LogManager& operator=(const LogManager&) = delete;
@@ -35,6 +39,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ILogSink>> sinksById_;
     const ValueCache& cache_;
     std::unordered_map<std::string, std::string> tagLabels_;
+    std::unordered_map<std::string, std::string> tagDevices_;
 
     std::vector<std::chrono::steady_clock::time_point> nextDue_;
     std::thread thread_;

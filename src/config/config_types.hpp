@@ -26,6 +26,12 @@ struct TagConfig {
                         // (CSV/SQLite/InfluxDB) and as the default widget
                         // caption, so a display name only has to be typed
                         // once per tag rather than once per widget/sink.
+    std::string device; // optional; identifies which physical device this
+                         // tag belongs to (e.g. "Camera 1"). InfluxLogSink
+                         // emits it as a real Influx tag, so two devices
+                         // sharing a label (e.g. two cameras both having a
+                         // "Finished" signal) land in separate time series
+                         // instead of colliding into one.
 };
 
 struct WidgetConfig {

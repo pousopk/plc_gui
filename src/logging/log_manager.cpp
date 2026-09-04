@@ -4,9 +4,10 @@
 LogManager::LogManager(std::vector<LogRuleConfig> rules,
                         std::unordered_map<std::string, std::shared_ptr<ILogSink>> sinksById,
                         const ValueCache& cache,
-                        std::unordered_map<std::string, std::string> tagLabels)
+                        std::unordered_map<std::string, std::string> tagLabels,
+                        std::unordered_map<std::string, std::string> tagDevices)
     : rules_(std::move(rules)), sinksById_(std::move(sinksById)), cache_(cache),
-      tagLabels_(std::move(tagLabels)) {
+      tagLabels_(std::move(tagLabels)), tagDevices_(std::move(tagDevices)) {
     nextDue_.assign(rules_.size(), std::chrono::steady_clock::now());
 }
 
@@ -34,7 +35,9 @@ void LogManager::runRule(const LogRuleConfig& rule) {
         if (it == snap->end()) continue; // not polled yet
         auto labelIt = tagLabels_.find(tagId);
         const std::string& displayName = (labelIt != tagLabels_.end()) ? labelIt->second : tagId;
-        values.push_back(LogValue{displayName, it->second.value, it->second.stale});
+        auto deviceIt = tagDevices_.find(tagId);
+        std::string device = (deviceIt != tagDevices_.end()) ? deviceIt->second : std::string();
+        values.push_back(LogValue{displayName, it->second.value, it->second.stale, device});
     }
     if (values.empty()) return;
 

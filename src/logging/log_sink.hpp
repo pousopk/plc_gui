@@ -8,6 +8,11 @@ struct LogValue {
     std::string tagId;
     PlcValue value;
     bool stale;
+    std::string device; // optional; empty if the tag has none. Currently
+                         // only InfluxLogSink uses this, emitting it as a
+                         // real Influx tag — CSV/SQLite ignore it, so
+                         // adding it here never breaks their existing
+                         // {tagId, value, stale} aggregate-init call sites.
 };
 
 // Persists rows handed to it. Knows nothing about YAML, panels, or the PLC.

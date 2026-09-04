@@ -139,6 +139,22 @@ logging: { sinks: [], rules: [] }
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader parses an optional tag device, defaulting to empty when omitted") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: cam1_finished, db: 1, type: bool, offset: 6, bit: 0, update_interval_ms: 100, device: "Camera 1" }
+  - { id: cam2_finished, db: 3, type: bool, offset: 6, bit: 0, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+    REQUIRE(cfg.tags.size() == 2);
+    CHECK(cfg.tags[0].device == "Camera 1");
+    CHECK(cfg.tags[1].device == "");
+    std::remove(path.c_str());
+}
+
 TEST_CASE("ConfigLoader parses uint and usint tag types") {
     auto path = writeTempYaml(R"YAML(
 plc: { ip: "1.2.3.4" }
