@@ -29,6 +29,17 @@ TEST_CASE("PlcClient connects to and disconnects from a local Snap7 server") {
     CHECK_FALSE(client.isConnected());
 }
 
+TEST_CASE("PlcClient pduLength returns 0 when not connected, and a positive value once connected") {
+    std::unique_ptr<TestPlcServer> server;
+    if (!startServerOrSkip(server, 10, 64)) return;
+
+    PlcClient client;
+    CHECK(client.pduLength() == 0);
+    client.connect("127.0.0.1", 0, 1);
+    CHECK(client.pduLength() > 0);
+    client.disconnect();
+}
+
 TEST_CASE("PlcClient readMultiVars/writeMultiVars round-trip against server memory") {
     std::unique_ptr<TestPlcServer> server;
     if (!startServerOrSkip(server, 10, 64)) return;

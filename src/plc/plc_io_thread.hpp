@@ -53,4 +53,10 @@ private:
 
     size_t backoffIndex_ = 0; // only touched by the I/O thread
     std::chrono::steady_clock::time_point nextConnectAttempt_{};
+
+    // Queried fresh from the PLC on every successful connect (PDU size is
+    // negotiated per-connection); falls back to kDefaultPduLength if the
+    // query fails. Read/write batches are sized against this, never a
+    // fixed item count alone — see buildByteSafeBatches.
+    int pduLength_ = kDefaultPduLength;
 };

@@ -39,6 +39,8 @@ bool PlcIoThread::tryConnect() {
         client_.connect(plcConfig_.ip, plcConfig_.rack, plcConfig_.slot);
         state_ = ConnectionState::Connected;
         backoffIndex_ = 0;
+        int negotiated = client_.pduLength();
+        pduLength_ = negotiated > 0 ? negotiated : kDefaultPduLength;
         return true;
     } catch (const PlcError& e) {
         state_ = ConnectionState::Reconnecting;
@@ -69,20 +71,29 @@ void PlcIoThread::drainWriteQueue() {
     }
     if (pending.empty()) return;
 
-    for (size_t i = 0; i < pending.size(); i += kMaxItemsPerBatch) {
-        size_t end = std::min(i + static_cast<size_t>(kMaxItemsPerBatch), pending.size());
+    // Resolve to TagConfig first so writes can reuse the same byte-safe
+    // batching as reads (a large multi-tag write is just as capable of
+    // exceeding the negotiated PDU as a large multi-tag read).
+    std::vector<TagConfig> pendingTags;
+    std::unordered_map<std::string, PlcValue> valueByTagId;
+    for (const auto& [tagId, value] : pending) {
+        auto it = tagsById_.find(tagId);
+        if (it == tagsById_.end()) continue; // unknown tag id, drop
+        pendingTags.push_back(it->second);
+        valueByTagId[tagId] = value;
+    }
+
+    auto batches = buildByteSafeBatches(pendingTags, pduLength_);
+    for (const auto& batch : batches) {
         std::vector<TS7DataItem> items;
         std::vector<std::vector<uint8_t>> buffers;
-        items.reserve(end - i);
-        buffers.reserve(end - i);
+        items.reserve(batch.size());
+        buffers.reserve(batch.size());
 
-        for (size_t j = i; j < end; ++j) {
-            auto it = tagsById_.find(pending[j].first);
-            if (it == tagsById_.end()) continue; // unknown tag id, drop
-            const TagConfig& tag = it->second;
+        for (const auto& tag : batch) {
             int size = plcTypeByteSize(tag.type);
             buffers.emplace_back(static_cast<size_t>(size), 0);
-            encodePlcValue(tag.type, pending[j].second, buffers.back().data(), 0, tag.bit);
+            encodePlcValue(tag.type, valueByTagId[tag.id], buffers.back().data(), 0, tag.bit);
 
             TS7DataItem item{};
             item.Area = S7AreaDB;
@@ -93,7 +104,6 @@ void PlcIoThread::drainWriteQueue() {
             item.pdata = buffers.back().data();
             items.push_back(item);
         }
-        if (items.empty()) continue;
         try {
             client_.writeMultiVars(items);
         } catch (const PlcError& e) {
@@ -107,7 +117,8 @@ void PlcIoThread::drainWriteQueue() {
 }
 
 void PlcIoThread::pollGroup(const PollGroup& group) {
-    for (const auto& batch : group.batches) {
+    auto batches = buildByteSafeBatches(group.tags, pduLength_);
+    for (const auto& batch : batches) {
         std::vector<TS7DataItem> items;
         std::vector<std::vector<uint8_t>> buffers;
         items.reserve(batch.size());
