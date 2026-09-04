@@ -1,0 +1,55 @@
+plc:
+  ip: "127.0.0.1"
+  rack: 0
+  slot: 1
+  connect_timeout_ms: 2000
+  reconnect_backoff_ms: [500, 1000, 2000, 5000]
+
+tags:
+  - id: motor1_speed
+    db: 10
+    type: real
+    offset: 0
+    update_interval_ms: 100
+  - id: motor1_running
+    db: 10
+    type: bool
+    offset: 4
+    bit: 0
+    update_interval_ms: 100
+  - id: tank_level
+    db: 20
+    type: int
+    offset: 0
+    update_interval_ms: 500
+
+panels:
+  - title: "Motor Control"
+    layout: vertical
+    widgets:
+      - type: slider
+        tag: motor1_speed
+        label: "Speed (RPM)"
+        min: "0"
+        max: "3000"
+      - type: toggle
+        tag: motor1_running
+        label: "Running"
+      - type: text_display
+        tag: tank_level
+        label: "Tank Level"
+        format: "%.0f L"
+
+logging:
+  sinks:
+    - id: csv_main
+      type: csv
+      path: "logs/plc_log.csv"
+    - id: sqlite_main
+      type: sqlite
+      path: "logs/plc_log.db"
+      table: "plc_readings"
+  rules:
+    - tags: [motor1_speed, motor1_running, tank_level]
+      interval_ms: 1000
+      sinks: [csv_main, sqlite_main]

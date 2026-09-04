@@ -74,6 +74,8 @@ set(PLC_GUI_SOURCES
     src/ui/widgets/text_display_widget.cpp
     src/ui/widgets/led_indicator_widget.cpp
     src/ui/panel_factory.cpp
+    src/ui/app_window.cpp
+    src/app/application.cpp
 )
 
 add_executable(plc_gui ${PLC_GUI_SOURCES})
@@ -85,6 +87,9 @@ target_link_libraries(plc_gui PRIVATE
     Threads::Threads
 )
 target_include_directories(plc_gui PRIVATE src)
+
+add_executable(fake_plc_server tools/fake_plc_server.cpp)
+target_link_libraries(fake_plc_server PRIVATE snap7_static Threads::Threads)
 
 enable_testing()
 add_subdirectory(tests)

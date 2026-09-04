@@ -9,3 +9,6 @@ logs/
 
 # clangd index cache
 .cache/
+
+# ImGui's auto-saved window layout (per-machine runtime state)
+imgui.ini
