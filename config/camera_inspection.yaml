@@ -1,10 +1,10 @@
 # DRAFT — do not deploy as-is. Still waiting on one confirmation from TIA Portal:
 #
-#   CAMERA_INSPECTION's instance DB must have "Optimized block access"
-#   unchecked. Optimized blocks have no fixed byte offsets — Snap7 cannot
-#   read them at all. If this DB is still optimized, the app will either
-#   fail to connect/read, or (if some other DB happens to occupy DB1)
-#   silently read the wrong memory.
+#   Every CAMERA_INSPECTION instance DB (DB1 for Camera 1, DB3 for Camera 2)
+#   must have "Optimized block access" unchecked. Optimized blocks have no
+#   fixed byte offsets — Snap7 cannot read them at all. If a DB is still
+#   optimized, the app will either fail to connect/read, or (if some other
+#   DB happens to occupy that number) silently read the wrong memory.
 #
 #   Offsets below are the REFERENCE layout for standard (non-optimized)
 #   access, computed from S7 struct-packing rules: consecutive Bools pack
@@ -34,9 +34,13 @@
 #   (led_indicator/text_display) — the PLC drives these, so nothing here
 #   writes to them.
 #
-#   Multiple camera instances: duplicate this whole tags:/panels: block
-#   with a distinct id prefix (cam2_, cam3_, ...) and that instance's real
-#   DB number, once you have them.
+#   Camera 2 (DB3) is wired up the same way as Camera 1 (DB1) — same
+#   offsets, same widget layout, distinct cam2_ tag ids. For a Camera 3,
+#   duplicate the same pattern again with cam3_ ids and its real DB number.
+#   Every tag also carries a `device` (e.g. "Camera 1"/"Camera 2"), emitted
+#   by InfluxLogSink as a real Influx tag — without it, both cameras'
+#   identically-labeled signals (e.g. "Finished") would land in the same
+#   Influx series and become indistinguishable in Grafana.
 
 plc:
   name: "PLC 1"
@@ -54,6 +58,7 @@ tags:
     bit: 0
     update_interval_ms: 200
     label: "In"
+    device: "Camera 1"
   - id: cam1_reset
     db: 1
     type: bool
@@ -61,6 +66,7 @@ tags:
     bit: 1
     update_interval_ms: 200
     label: "Reset"
+    device: "Camera 1"
   - id: cam1_trigger_software
     db: 1
     type: bool
@@ -68,12 +74,14 @@ tags:
     bit: 2
     update_interval_ms: 200
     label: "Trigger Software"
+    device: "Camera 1"
   - id: cam1_timeout
     db: 1
     type: time
     offset: 2
     update_interval_ms: 200
     label: "Timeout"
+    device: "Camera 1"
   - id: cam1_finished
     db: 1
     type: bool
@@ -81,6 +89,7 @@ tags:
     bit: 0
     update_interval_ms: 200
     label: "Finished"
+    device: "Camera 1"
   - id: cam1_ok
     db: 1
     type: bool
@@ -88,6 +97,7 @@ tags:
     bit: 1
     update_interval_ms: 200
     label: "Ok"
+    device: "Camera 1"
   - id: cam1_nok
     db: 1
     type: bool
@@ -95,6 +105,7 @@ tags:
     bit: 2
     update_interval_ms: 200
     label: "NOk"
+    device: "Camera 1"
   - id: cam1_trigger_cam
     db: 1
     type: bool
@@ -102,6 +113,7 @@ tags:
     bit: 3
     update_interval_ms: 200
     label: "Trigger Cam"
+    device: "Camera 1"
   - id: cam1_timeout_error
     db: 1
     type: bool
@@ -109,6 +121,7 @@ tags:
     bit: 4
     update_interval_ms: 200
     label: "Timeout Error"
+    device: "Camera 1"
   - id: cam1_ready
     db: 1
     type: bool
@@ -116,6 +129,7 @@ tags:
     bit: 5
     update_interval_ms: 200
     label: "Ready"
+    device: "Camera 1"
   - id: cam1_busy
     db: 1
     type: bool
@@ -123,6 +137,7 @@ tags:
     bit: 6
     update_interval_ms: 200
     label: "Busy"
+    device: "Camera 1"
   - id: cam1_reset_ack
     db: 1
     type: bool
@@ -130,6 +145,102 @@ tags:
     bit: 7
     update_interval_ms: 200
     label: "Reset Ack"
+    device: "Camera 1"
+  - id: cam2_in
+    db: 3
+    type: bool
+    offset: 0
+    bit: 0
+    update_interval_ms: 200
+    label: "In"
+    device: "Camera 2"
+  - id: cam2_reset
+    db: 3
+    type: bool
+    offset: 0
+    bit: 1
+    update_interval_ms: 200
+    label: "Reset"
+    device: "Camera 2"
+  - id: cam2_trigger_software
+    db: 3
+    type: bool
+    offset: 0
+    bit: 2
+    update_interval_ms: 200
+    label: "Trigger Software"
+    device: "Camera 2"
+  - id: cam2_timeout
+    db: 3
+    type: time
+    offset: 2
+    update_interval_ms: 200
+    label: "Timeout"
+    device: "Camera 2"
+  - id: cam2_finished
+    db: 3
+    type: bool
+    offset: 6
+    bit: 0
+    update_interval_ms: 200
+    label: "Finished"
+    device: "Camera 2"
+  - id: cam2_ok
+    db: 3
+    type: bool
+    offset: 6
+    bit: 1
+    update_interval_ms: 200
+    label: "Ok"
+    device: "Camera 2"
+  - id: cam2_nok
+    db: 3
+    type: bool
+    offset: 6
+    bit: 2
+    update_interval_ms: 200
+    label: "NOk"
+    device: "Camera 2"
+  - id: cam2_trigger_cam
+    db: 3
+    type: bool
+    offset: 6
+    bit: 3
+    update_interval_ms: 200
+    label: "Trigger Cam"
+    device: "Camera 2"
+  - id: cam2_timeout_error
+    db: 3
+    type: bool
+    offset: 6
+    bit: 4
+    update_interval_ms: 200
+    label: "Timeout Error"
+    device: "Camera 2"
+  - id: cam2_ready
+    db: 3
+    type: bool
+    offset: 6
+    bit: 5
+    update_interval_ms: 200
+    label: "Ready"
+    device: "Camera 2"
+  - id: cam2_busy
+    db: 3
+    type: bool
+    offset: 6
+    bit: 6
+    update_interval_ms: 200
+    label: "Busy"
+    device: "Camera 2"
+  - id: cam2_reset_ack
+    db: 3
+    type: bool
+    offset: 6
+    bit: 7
+    update_interval_ms: 200
+    label: "Reset Ack"
+    device: "Camera 2"
 
 # One panel per device. Inputs/Outputs are nested groups (collapsible
 # sub-sections) inside that single panel, not separate top-level windows.
@@ -179,6 +290,49 @@ panels:
           - type: led_indicator
             tag: cam1_reset_ack
             label: "Reset Ack"
+  - title: "Camera 2"
+    layout: vertical
+    groups:
+      - title: "Inputs"
+        widgets:
+          - type: toggle
+            tag: cam2_in
+            label: "In"
+          - type: button
+            tag: cam2_reset
+            label: "Reset"
+          - type: button
+            tag: cam2_trigger_software
+            label: "Trigger Software"
+          - type: input_number
+            tag: cam2_timeout
+            label: "Timeout (ms)"
+      - title: "Outputs"
+        widgets:
+          - type: led_indicator
+            tag: cam2_finished
+            label: "Finished"
+          - type: led_indicator
+            tag: cam2_ok
+            label: "Ok"
+          - type: led_indicator
+            tag: cam2_nok
+            label: "NOk"
+          - type: led_indicator
+            tag: cam2_trigger_cam
+            label: "Trigger Cam"
+          - type: led_indicator
+            tag: cam2_timeout_error
+            label: "Timeout Error"
+          - type: led_indicator
+            tag: cam2_ready
+            label: "Ready"
+          - type: led_indicator
+            tag: cam2_busy
+            label: "Busy"
+          - type: led_indicator
+            tag: cam2_reset_ack
+            label: "Reset Ack"
 
 logging:
   sinks:
@@ -213,5 +367,17 @@ logging:
         - cam1_ready
         - cam1_busy
         - cam1_reset_ack
+        - cam2_in
+        - cam2_reset
+        - cam2_trigger_software
+        - cam2_timeout
+        - cam2_finished
+        - cam2_ok
+        - cam2_nok
+        - cam2_trigger_cam
+        - cam2_timeout_error
+        - cam2_ready
+        - cam2_busy
+        - cam2_reset_ack
       interval_ms: 1000
       sinks: [csv_main, sqlite_main, influx_main]
