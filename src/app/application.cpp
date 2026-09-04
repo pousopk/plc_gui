@@ -76,7 +76,7 @@ int Application::run() {
         cv.wait(lock, [&] { return stopFlag.load(); });
     } else {
         auto panels = PanelFactory::build(config_.panels, config_.tags);
-        AppWindow window(std::move(panels), cache, io);
+        AppWindow window(config_.plc.name, std::move(panels), cache, io);
         window.run();
     }
 

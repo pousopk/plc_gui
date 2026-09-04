@@ -12,8 +12,8 @@ void glfwErrorCallback(int error, const char* description) {
 }
 } // namespace
 
-AppWindow::AppWindow(std::vector<Panel> panels, ValueCache& cache, PlcIoThread& io)
-    : panels_(std::move(panels)), cache_(cache), io_(io) {
+AppWindow::AppWindow(std::string plcName, std::vector<Panel> panels, ValueCache& cache, PlcIoThread& io)
+    : plcName_(std::move(plcName)), panels_(std::move(panels)), cache_(cache), io_(io) {
     glfwSetErrorCallback(glfwErrorCallback);
     if (!glfwInit()) throw std::runtime_error("AppWindow: glfwInit failed");
 
@@ -58,27 +58,44 @@ void AppWindow::renderFrame() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("Status");
-    ImGui::Text("PLC: %s", connectionStateLabel(io_.connectionState()));
-    ImGui::End();
-
     auto snap = cache_.snapshot();
-    for (auto& panel : panels_) {
-        ImGui::Begin(panel.title.c_str());
-        for (auto& widget : panel.widgets) {
-            widget->render(*snap, io_);
-        }
-        for (auto& group : panel.groups) {
-            if (ImGui::CollapsingHeader(group.title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::Indent();
-                for (auto& widget : group.widgets) {
-                    widget->render(*snap, io_);
-                }
-                ImGui::Unindent();
+
+    // One window for the whole PLC connection: status at the top, then
+    // every device panel nested inside as a collapsible section, each
+    // panel's own groups (e.g. "Inputs"/"Outputs") nested one level
+    // deeper still. PushID/PopID per panel and per group guards against
+    // two devices sharing a group title (e.g. two cameras both having an
+    // "Inputs" section) — without it, ImGui would generate the same
+    // widget id for both and conflate their open/closed state.
+    ImGui::Begin(plcName_.c_str());
+    ImGui::Text("Connection: %s", connectionStateLabel(io_.connectionState()));
+    ImGui::Separator();
+
+    for (size_t pi = 0; pi < panels_.size(); ++pi) {
+        auto& panel = panels_[pi];
+        ImGui::PushID(static_cast<int>(pi));
+        if (ImGui::CollapsingHeader(panel.title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Indent();
+            for (auto& widget : panel.widgets) {
+                widget->render(*snap, io_);
             }
+            for (size_t gi = 0; gi < panel.groups.size(); ++gi) {
+                auto& group = panel.groups[gi];
+                ImGui::PushID(static_cast<int>(gi));
+                if (ImGui::CollapsingHeader(group.title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                    ImGui::Indent();
+                    for (auto& widget : group.widgets) {
+                        widget->render(*snap, io_);
+                    }
+                    ImGui::Unindent();
+                }
+                ImGui::PopID();
+            }
+            ImGui::Unindent();
         }
-        ImGui::End();
+        ImGui::PopID();
     }
+    ImGui::End();
 
     ImGui::Render();
     int w = 0, h = 0;

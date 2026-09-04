@@ -86,6 +86,28 @@ TEST_CASE("ConfigLoader parses a valid config into typed structs") {
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader parses an optional plc name, defaulting to \"PLC\" when omitted") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4", name: "PLC 1" }
+tags: []
+panels: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+    CHECK(cfg.plc.name == "PLC 1");
+    std::remove(path.c_str());
+
+    auto path2 = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg2 = ConfigLoader::load(path2);
+    CHECK(cfg2.plc.name == "PLC");
+    std::remove(path2.c_str());
+}
+
 TEST_CASE("ConfigLoader throws ConfigError with the field path on a missing required field") {
     auto path = writeTempYaml(R"(
 plc:

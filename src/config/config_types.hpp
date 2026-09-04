@@ -6,6 +6,7 @@
 #include <vector>
 
 struct PlcConnectionConfig {
+    std::string name = "PLC"; // display name for the GUI's outermost window
     std::string ip;
     int rack = 0;
     int slot = 1;

@@ -39,6 +39,7 @@
 #   DB number, once you have them.
 
 plc:
+  name: "PLC 1"
   ip: "192.168.1.160"
   rack: 0
   slot: 1

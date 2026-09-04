@@ -36,6 +36,7 @@ PlcType parsePlcType(const std::string& s, const std::string& context) {
 PlcConnectionConfig parsePlc(const YAML::Node& root) {
     YAML::Node node = requireNode(root, "plc", "root");
     PlcConnectionConfig cfg;
+    cfg.name = node["name"] ? node["name"].as<std::string>() : cfg.name;
     cfg.ip = requireNode(node, "ip", "plc").as<std::string>();
     cfg.rack = node["rack"] ? node["rack"].as<int>() : cfg.rack;
     cfg.slot = node["slot"] ? node["slot"].as<int>() : cfg.slot;
