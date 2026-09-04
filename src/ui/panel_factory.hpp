@@ -5,9 +5,15 @@
 #include <string>
 #include <vector>
 
-struct Panel {
+struct WidgetGroup {
     std::string title;
     std::vector<std::unique_ptr<IWidget>> widgets;
+};
+
+struct Panel {
+    std::string title;
+    std::vector<std::unique_ptr<IWidget>> widgets; // ungrouped
+    std::vector<WidgetGroup> groups;                // labeled sub-sections
 };
 
 class PanelFactory {

@@ -130,49 +130,54 @@ tags:
     update_interval_ms: 200
     label: "Reset Ack"
 
+# One panel per device. Inputs/Outputs are nested groups (collapsible
+# sub-sections) inside that single panel, not separate top-level windows.
+# Duplicate this whole panel block per additional camera, with its own
+# title and its own cam2_/cam3_/... tag ids.
 panels:
-  - title: "Camera 1 - Inputs"
+  - title: "Camera 1"
     layout: vertical
-    widgets:
-      - type: toggle
-        tag: cam1_in
-        label: "In"
-      - type: button
-        tag: cam1_reset
-        label: "Reset"
-      - type: button
-        tag: cam1_trigger_software
-        label: "Trigger Software"
-      - type: input_number
-        tag: cam1_timeout
-        label: "Timeout (ms)"
-  - title: "Camera 1 - Outputs"
-    layout: vertical
-    widgets:
-      - type: led_indicator
-        tag: cam1_finished
-        label: "Finished"
-      - type: led_indicator
-        tag: cam1_ok
-        label: "Ok"
-      - type: led_indicator
-        tag: cam1_nok
-        label: "NOk"
-      - type: led_indicator
-        tag: cam1_trigger_cam
-        label: "Trigger Cam"
-      - type: led_indicator
-        tag: cam1_timeout_error
-        label: "Timeout Error"
-      - type: led_indicator
-        tag: cam1_ready
-        label: "Ready"
-      - type: led_indicator
-        tag: cam1_busy
-        label: "Busy"
-      - type: led_indicator
-        tag: cam1_reset_ack
-        label: "Reset Ack"
+    groups:
+      - title: "Inputs"
+        widgets:
+          - type: toggle
+            tag: cam1_in
+            label: "In"
+          - type: button
+            tag: cam1_reset
+            label: "Reset"
+          - type: button
+            tag: cam1_trigger_software
+            label: "Trigger Software"
+          - type: input_number
+            tag: cam1_timeout
+            label: "Timeout (ms)"
+      - title: "Outputs"
+        widgets:
+          - type: led_indicator
+            tag: cam1_finished
+            label: "Finished"
+          - type: led_indicator
+            tag: cam1_ok
+            label: "Ok"
+          - type: led_indicator
+            tag: cam1_nok
+            label: "NOk"
+          - type: led_indicator
+            tag: cam1_trigger_cam
+            label: "Trigger Cam"
+          - type: led_indicator
+            tag: cam1_timeout_error
+            label: "Timeout Error"
+          - type: led_indicator
+            tag: cam1_ready
+            label: "Ready"
+          - type: led_indicator
+            tag: cam1_busy
+            label: "Busy"
+          - type: led_indicator
+            tag: cam1_reset_ack
+            label: "Reset Ack"
 
 logging:
   sinks:

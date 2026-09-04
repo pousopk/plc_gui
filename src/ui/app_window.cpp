@@ -68,6 +68,15 @@ void AppWindow::renderFrame() {
         for (auto& widget : panel.widgets) {
             widget->render(*snap, io_);
         }
+        for (auto& group : panel.groups) {
+            if (ImGui::CollapsingHeader(group.title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Indent();
+                for (auto& widget : group.widgets) {
+                    widget->render(*snap, io_);
+                }
+                ImGui::Unindent();
+            }
+        }
         ImGui::End();
     }
 

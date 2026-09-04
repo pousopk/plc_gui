@@ -94,6 +94,21 @@ std::vector<PanelConfig> parsePanels(const YAML::Node& root) {
                 p.widgets.push_back(parseWidget(w, ctx + ".widgets[" + std::to_string(i++) + "]"));
             }
         }
+        if (item["groups"]) {
+            int gi = 0;
+            for (const auto& g : item["groups"]) {
+                std::string groupCtx = ctx + ".groups[" + std::to_string(gi++) + "]";
+                WidgetGroupConfig group;
+                group.title = requireNode(g, "title", groupCtx).as<std::string>();
+                if (g["widgets"]) {
+                    int wi = 0;
+                    for (const auto& w : g["widgets"]) {
+                        group.widgets.push_back(parseWidget(w, groupCtx + ".widgets[" + std::to_string(wi++) + "]"));
+                    }
+                }
+                p.groups.push_back(std::move(group));
+            }
+        }
         panels.push_back(std::move(p));
     }
     return panels;
@@ -147,6 +162,17 @@ void validateReferences(const AppConfig& cfg) {
             if (!tagIds.count(w.tag)) {
                 fail("panels[" + std::to_string(pi) + "].widgets[" + std::to_string(wi) + "].tag",
                      "references unknown tag '" + w.tag + "'");
+            }
+        }
+        for (size_t gi = 0; gi < cfg.panels[pi].groups.size(); ++gi) {
+            const auto& group = cfg.panels[pi].groups[gi];
+            for (size_t wi = 0; wi < group.widgets.size(); ++wi) {
+                const auto& w = group.widgets[wi];
+                if (!tagIds.count(w.tag)) {
+                    fail("panels[" + std::to_string(pi) + "].groups[" + std::to_string(gi) +
+                             "].widgets[" + std::to_string(wi) + "].tag",
+                         "references unknown tag '" + w.tag + "'");
+                }
             }
         }
     }

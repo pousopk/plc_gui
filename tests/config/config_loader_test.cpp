@@ -200,6 +200,55 @@ logging:
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader parses panel groups, nesting widgets inside") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: t1, db: 1, type: bool, offset: 0, update_interval_ms: 100 }
+  - { id: t2, db: 1, type: bool, offset: 0, bit: 1, update_interval_ms: 100 }
+panels:
+  - title: "Camera 1"
+    layout: vertical
+    groups:
+      - title: "Inputs"
+        widgets:
+          - { type: toggle, tag: t1 }
+      - title: "Outputs"
+        widgets:
+          - { type: led_indicator, tag: t2 }
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+    REQUIRE(cfg.panels.size() == 1);
+    CHECK(cfg.panels[0].title == "Camera 1");
+    CHECK(cfg.panels[0].widgets.empty());
+    REQUIRE(cfg.panels[0].groups.size() == 2);
+    CHECK(cfg.panels[0].groups[0].title == "Inputs");
+    REQUIRE(cfg.panels[0].groups[0].widgets.size() == 1);
+    CHECK(cfg.panels[0].groups[0].widgets[0].tag == "t1");
+    CHECK(cfg.panels[0].groups[1].title == "Outputs");
+    REQUIRE(cfg.panels[0].groups[1].widgets.size() == 1);
+    CHECK(cfg.panels[0].groups[1].widgets[0].tag == "t2");
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects a group widget referencing an unknown tag") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: t1, db: 1, type: bool, offset: 0, update_interval_ms: 100 }
+panels:
+  - title: "Camera 1"
+    groups:
+      - title: "Inputs"
+        widgets:
+          - { type: toggle, tag: does_not_exist }
+logging: { sinks: [], rules: [] }
+)YAML");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
 TEST_CASE("ConfigLoader rejects an unknown widget type") {
     auto path = writeTempYaml(R"(
 plc: { ip: "1.2.3.4" }

@@ -80,6 +80,42 @@ TEST_CASE("A widget's caption defaults to the tag's label, but its own label par
     CHECK(w1->label() == "Custom Ok Caption");
 }
 
+TEST_CASE("PanelFactory builds grouped widgets nested inside a single panel") {
+    std::vector<TagConfig> tags = {makeTag("cam1_in", PlcType::Bool), makeTag("cam1_finished", PlcType::Bool)};
+
+    PanelConfig panel;
+    panel.title = "Camera 1";
+
+    WidgetGroupConfig inputs;
+    inputs.title = "Inputs";
+    WidgetConfig toggle;
+    toggle.type = "toggle";
+    toggle.tag = "cam1_in";
+    inputs.widgets = {toggle};
+
+    WidgetGroupConfig outputs;
+    outputs.title = "Outputs";
+    WidgetConfig led;
+    led.type = "led_indicator";
+    led.tag = "cam1_finished";
+    outputs.widgets = {led};
+
+    panel.groups = {inputs, outputs};
+
+    auto panels = PanelFactory::build({panel}, tags);
+
+    REQUIRE(panels.size() == 1);
+    CHECK(panels[0].title == "Camera 1");
+    CHECK(panels[0].widgets.empty()); // no ungrouped widgets in this panel
+    REQUIRE(panels[0].groups.size() == 2);
+    CHECK(panels[0].groups[0].title == "Inputs");
+    REQUIRE(panels[0].groups[0].widgets.size() == 1);
+    CHECK(panels[0].groups[0].widgets[0]->tagId() == "cam1_in");
+    CHECK(panels[0].groups[1].title == "Outputs");
+    REQUIRE(panels[0].groups[1].widgets.size() == 1);
+    CHECK(panels[0].groups[1].widgets[0]->tagId() == "cam1_finished");
+}
+
 TEST_CASE("PanelFactory throws when a widget references a tag not in the tag list") {
     PanelConfig panel;
     panel.title = "P";

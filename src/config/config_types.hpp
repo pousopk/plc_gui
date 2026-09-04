@@ -33,10 +33,19 @@ struct WidgetConfig {
     std::map<std::string, std::string> params; // label, min, max, format, ... (widget-specific)
 };
 
+// A labeled, collapsible sub-section of widgets nested inside a panel —
+// e.g. a device's "Inputs" and "Outputs" both contained within one panel
+// for that device, rather than each being its own top-level window.
+struct WidgetGroupConfig {
+    std::string title;
+    std::vector<WidgetConfig> widgets;
+};
+
 struct PanelConfig {
     std::string title;
     std::string layout = "vertical";
-    std::vector<WidgetConfig> widgets;
+    std::vector<WidgetConfig> widgets;      // ungrouped widgets, rendered flat
+    std::vector<WidgetGroupConfig> groups;  // optional labeled sub-sections
 };
 
 struct LogSinkConfig {

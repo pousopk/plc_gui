@@ -26,6 +26,18 @@ const std::map<std::string, WidgetFactoryFn>& widgetRegistry() {
     return registry;
 }
 
+std::unique_ptr<IWidget> buildWidget(const WidgetConfig& wc, const std::unordered_map<std::string, TagConfig>& tagsById) {
+    auto tagIt = tagsById.find(wc.tag);
+    if (tagIt == tagsById.end()) {
+        throw std::runtime_error("PanelFactory: widget references unknown tag '" + wc.tag + "'");
+    }
+    auto factoryIt = widgetRegistry().find(wc.type);
+    if (factoryIt == widgetRegistry().end()) {
+        throw std::runtime_error("PanelFactory: unknown widget type '" + wc.type + "'");
+    }
+    return factoryIt->second(wc, tagIt->second);
+}
+
 } // namespace
 
 std::vector<Panel> PanelFactory::build(const std::vector<PanelConfig>& panelConfigs,
@@ -38,15 +50,15 @@ std::vector<Panel> PanelFactory::build(const std::vector<PanelConfig>& panelConf
         Panel panel;
         panel.title = pc.title;
         for (const auto& wc : pc.widgets) {
-            auto tagIt = tagsById.find(wc.tag);
-            if (tagIt == tagsById.end()) {
-                throw std::runtime_error("PanelFactory: widget references unknown tag '" + wc.tag + "'");
+            panel.widgets.push_back(buildWidget(wc, tagsById));
+        }
+        for (const auto& gc : pc.groups) {
+            WidgetGroup group;
+            group.title = gc.title;
+            for (const auto& wc : gc.widgets) {
+                group.widgets.push_back(buildWidget(wc, tagsById));
             }
-            auto factoryIt = widgetRegistry().find(wc.type);
-            if (factoryIt == widgetRegistry().end()) {
-                throw std::runtime_error("PanelFactory: unknown widget type '" + wc.type + "'");
-            }
-            panel.widgets.push_back(factoryIt->second(wc, tagIt->second));
+            panel.groups.push_back(std::move(group));
         }
         panels.push_back(std::move(panel));
     }
