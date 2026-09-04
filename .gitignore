@@ -1,0 +1,11 @@
+build/
+*.o
+compile_commands.json
+
+# Fetched via FetchContent at configure time (pinned commit in cmake/snap7.cmake) — reproducible, not vendored.
+third_party/
+
+logs/
+
+# clangd index cache
+.cache/
