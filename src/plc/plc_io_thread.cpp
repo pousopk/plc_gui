@@ -1,5 +1,6 @@
 #include "plc/plc_io_thread.hpp"
 #include <algorithm>
+#include <iostream>
 
 PlcIoThread::PlcIoThread(PlcConnectionConfig plcConfig, std::vector<TagConfig> tags, ValueCache& cache)
     : plcConfig_(std::move(plcConfig)), tags_(std::move(tags)), cache_(cache) {
@@ -39,8 +40,10 @@ bool PlcIoThread::tryConnect() {
         state_ = ConnectionState::Connected;
         backoffIndex_ = 0;
         return true;
-    } catch (const PlcError&) {
+    } catch (const PlcError& e) {
         state_ = ConnectionState::Reconnecting;
+        std::cerr << "PlcIoThread: connect to " << plcConfig_.ip << " rack=" << plcConfig_.rack
+                  << " slot=" << plcConfig_.slot << " failed: " << e.what() << " (code " << e.code() << ")\n";
         markAllStale();
         int delayMs = plcConfig_.reconnectBackoffMs.empty()
             ? 1000
@@ -93,8 +96,9 @@ void PlcIoThread::drainWriteQueue() {
         if (items.empty()) continue;
         try {
             client_.writeMultiVars(items);
-        } catch (const PlcError&) {
+        } catch (const PlcError& e) {
             state_ = ConnectionState::Reconnecting;
+            std::cerr << "PlcIoThread: write failed: " << e.what() << " (code " << e.code() << ")\n";
             markAllStale();
             client_.disconnect();
             return;
@@ -124,8 +128,12 @@ void PlcIoThread::pollGroup(const PollGroup& group) {
 
         try {
             client_.readMultiVars(items);
-        } catch (const PlcError&) {
+        } catch (const PlcError& e) {
             state_ = ConnectionState::Reconnecting;
+            std::cerr << "PlcIoThread: read failed on DB" << batch.front().db
+                      << " (tags:";
+            for (const auto& tag : batch) std::cerr << " " << tag.id;
+            std::cerr << "): " << e.what() << " (code " << e.code() << ")\n";
             markAllStale();
             client_.disconnect();
             return;
