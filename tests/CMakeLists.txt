@@ -25,12 +25,21 @@ set(PLC_GUI_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/logging/sqlite_log_sink.cpp
     logging/log_manager_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/log_manager.cpp
+    ui/panel_factory_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/widgets/slider_widget.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/widgets/input_number_widget.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/widgets/toggle_widget.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/widgets/button_widget.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/widgets/text_display_widget.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/widgets/led_indicator_widget.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/panel_factory.cpp
 )
 
 add_executable(plc_gui_tests ${PLC_GUI_TEST_SOURCES})
 target_link_libraries(plc_gui_tests PRIVATE
     doctest::doctest
     yaml-cpp::yaml-cpp
+    imgui
     snap7_static
     SQLite::SQLite3
     Threads::Threads

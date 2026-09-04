@@ -67,6 +67,13 @@ set(PLC_GUI_SOURCES
     src/logging/csv_log_sink.cpp
     src/logging/sqlite_log_sink.cpp
     src/logging/log_manager.cpp
+    src/ui/widgets/slider_widget.cpp
+    src/ui/widgets/input_number_widget.cpp
+    src/ui/widgets/toggle_widget.cpp
+    src/ui/widgets/button_widget.cpp
+    src/ui/widgets/text_display_widget.cpp
+    src/ui/widgets/led_indicator_widget.cpp
+    src/ui/panel_factory.cpp
 )
 
 add_executable(plc_gui ${PLC_GUI_SOURCES})
