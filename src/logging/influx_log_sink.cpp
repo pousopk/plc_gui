@@ -30,17 +30,22 @@ std::string buildInfluxLineProtocol(const std::string& measurement,
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(ts.time_since_epoch()).count();
     std::ostringstream out;
     for (const auto& v : values) {
-        out << measurement << ",tag_id=" << escapeTag(v.tagId) << " value=";
+        out << measurement << ",tag_id=" << escapeTag(v.tagId) << " ";
+        // InfluxDB enforces one type per field name *per measurement* (not
+        // per series), so tags of different PlcValue types can't all share
+        // a "value" field — a bool-typed tag and an int-typed tag in the
+        // same measurement would collide and one gets silently dropped.
+        // Each type gets its own field name instead.
         std::visit([&out](auto&& val) {
             using T = std::decay_t<decltype(val)>;
             if constexpr (std::is_same_v<T, bool>) {
-                out << (val ? "true" : "false");
+                out << "value_bool=" << (val ? "true" : "false");
             } else if constexpr (std::is_same_v<T, int32_t>) {
-                out << val << "i";
+                out << "value_int=" << val << "i";
             } else {
                 char buf[32];
                 std::snprintf(buf, sizeof(buf), "%g", val);
-                out << buf;
+                out << "value_float=" << buf;
             }
         }, v.value);
         out << ",stale=" << (v.stale ? "true" : "false");

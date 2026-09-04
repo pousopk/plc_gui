@@ -14,9 +14,31 @@ TEST_CASE("buildInfluxLineProtocol formats bool, int, and float fields correctly
 
     std::string line = buildInfluxLineProtocol("plc_readings", ts, values);
 
-    CHECK(line.find("plc_readings,tag_id=tag1 value=42i,stale=false 1700000000123\n") != std::string::npos);
-    CHECK(line.find("plc_readings,tag_id=tag2 value=true,stale=true 1700000000123\n") != std::string::npos);
-    CHECK(line.find("plc_readings,tag_id=tag3 value=3.5,stale=false 1700000000123\n") != std::string::npos);
+    CHECK(line.find("plc_readings,tag_id=tag1 value_int=42i,stale=false 1700000000123\n") != std::string::npos);
+    CHECK(line.find("plc_readings,tag_id=tag2 value_bool=true,stale=true 1700000000123\n") != std::string::npos);
+    CHECK(line.find("plc_readings,tag_id=tag3 value_float=3.5,stale=false 1700000000123\n") != std::string::npos);
+}
+
+TEST_CASE("buildInfluxLineProtocol never uses the same field name for different PlcValue types") {
+    // InfluxDB enforces one type per field name per measurement (not per
+    // series) — a bool tag and an int tag sharing a field name in the same
+    // measurement causes one to be silently dropped on write. Each type
+    // must get a distinct field key so mixed-type measurements never
+    // collide, no matter how many tags of each type are present.
+    auto ts = std::chrono::system_clock::time_point(std::chrono::milliseconds(1000));
+    std::vector<LogValue> values = {
+        {"a", true, false},
+        {"b", false, false},
+        {"c", int32_t{7}, false},
+        {"d", 1.5f, false},
+    };
+
+    std::string line = buildInfluxLineProtocol("m", ts, values);
+
+    CHECK(line.find("value_bool=") != std::string::npos);
+    CHECK(line.find("value_int=") != std::string::npos);
+    CHECK(line.find("value_float=") != std::string::npos);
+    CHECK(line.find(" value=") == std::string::npos); // the old, colliding field name must be gone
 }
 
 TEST_CASE("buildInfluxLineProtocol escapes spaces, commas, and equals signs in tag_id") {
