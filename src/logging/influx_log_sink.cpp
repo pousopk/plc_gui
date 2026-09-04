@@ -16,7 +16,9 @@ std::string escapeTag(const std::string& s) {
     return out;
 }
 
-size_t discardWriteCallback(char*, size_t size, size_t nmemb, void*) {
+size_t captureWriteCallback(char* data, size_t size, size_t nmemb, void* userp) {
+    auto* out = static_cast<std::string*>(userp);
+    out->append(data, size * nmemb);
     return size * nmemb;
 }
 
@@ -64,12 +66,15 @@ void InfluxLogSink::writeRow(std::chrono::system_clock::time_point ts, const std
     std::string writeUrl = url_ + "/api/v2/write?org=" + org_ + "&bucket=" + bucket_ + "&precision=ms";
     std::string authHeader = "Authorization: Token " + token_;
 
+    std::string responseBody;
+
     curl_easy_reset(curl_);
     curl_easy_setopt(curl_, CURLOPT_URL, writeUrl.c_str());
     curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, body.c_str());
     curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
     curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, 3000L);
-    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, discardWriteCallback);
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, captureWriteCallback);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &responseBody);
 
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, authHeader.c_str());
@@ -85,7 +90,8 @@ void InfluxLogSink::writeRow(std::chrono::system_clock::time_point ts, const std
         throw std::runtime_error(std::string("InfluxLogSink: curl error: ") + curl_easy_strerror(rc));
     }
     if (httpCode < 200 || httpCode >= 300) {
-        throw std::runtime_error("InfluxLogSink: HTTP " + std::to_string(httpCode) + " from InfluxDB write endpoint");
+        throw std::runtime_error("InfluxLogSink: HTTP " + std::to_string(httpCode) +
+                                  " from InfluxDB write endpoint: " + responseBody);
     }
 }
 
