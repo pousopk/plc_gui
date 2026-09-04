@@ -10,3 +10,4 @@ using PlcValue = std::variant<bool, int32_t, float>;
 // S7 word/dword/real values are big-endian on the wire.
 PlcValue decodePlcValue(PlcType type, const uint8_t* buf, int byteOffset, int bit);
 void encodePlcValue(PlcType type, PlcValue value, uint8_t* buf, int byteOffset, int bit);
+int plcTypeByteSize(PlcType type); // 1 for Bool, 2 for Int, 4 for Real

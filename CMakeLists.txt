@@ -63,6 +63,7 @@ set(PLC_GUI_SOURCES
     src/config/config_loader.cpp
     src/plc/plc_client.cpp
     src/plc/poll_group.cpp
+    src/plc/plc_io_thread.cpp
 )
 
 add_executable(plc_gui ${PLC_GUI_SOURCES})

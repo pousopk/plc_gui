@@ -63,3 +63,12 @@ void encodePlcValue(PlcType type, PlcValue value, uint8_t* buf, int byteOffset, 
             break;
     }
 }
+
+int plcTypeByteSize(PlcType type) {
+    switch (type) {
+        case PlcType::Bool: return 1;
+        case PlcType::Int:  return 2;
+        case PlcType::Real: return 4;
+    }
+    return 0;
+}
