@@ -1,0 +1,153 @@
+# Feature demo config -- every plc_gui feature in one file, runnable with no
+# real hardware. Each section below is numbered in the order it's worth
+# explaining; the "Show:" lines say what to point at in the GUI.
+#
+# Run it (from the repo root, two terminals):
+#   ./build/fake_plc_server --config config/demo.yaml
+#   ./build/plc_gui --config config/demo.yaml
+# Check it without running anything:
+#   ./build/plc_gui --validate-config --config config/demo.yaml
+#
+# fake_plc_server animates every read-only tag (bools flip every 3 s, reals
+# follow a 0-100 sine wave, integers count up and wrap at 1000) and holds
+# every tag bound to a writable widget at whatever the GUI last wrote.
+
+# --- 1. Connection ----------------------------------------------------------
+# Show: the header's connection status dot. Stop fake_plc_server (Ctrl+C)
+# and it goes to Reconnecting, with every value marked stale; restart it and
+# the app reconnects on its own, retrying after 500 ms, 1 s, 2 s, then every 5 s.
+plc:
+  name: "Demo Line (fake PLC)"
+  ip: "127.0.0.1"
+  rack: 0
+  slot: 1
+  connect_timeout_ms: 2000
+  reconnect_backoff_ms: [500, 1000, 2000, 5000]
+
+# --- 2. Hand-written tags ---------------------------------------------------
+# One entry per PLC value: which DB, which byte offset, which type. Covers
+# every supported type: real, bool, uint, usint, int, time.
+tags:
+  # DB 10 -- the "Mixer". `device:` groups these tags together in the Trends
+  # checklist and keeps them apart from same-named tags on other devices.
+  - { id: mixer_speed_sp,     db: 10, type: real,  offset: 0,  update_interval_ms: 100,  label: "Speed Setpoint", device: "Mixer" }
+  - { id: mixer_speed,        db: 10, type: real,  offset: 4,  update_interval_ms: 100,  label: "Speed",          device: "Mixer" }
+  - { id: mixer_enable,       db: 10, type: bool,  offset: 8,  bit: 0, update_interval_ms: 200, label: "Enable", device: "Mixer" }
+  - { id: mixer_start,        db: 10, type: bool,  offset: 9,  bit: 0, update_interval_ms: 200, label: "Start",  device: "Mixer" }
+  # Bit packing: three read-only bools share byte 10 (bits 0, 1, 2). The
+  # overlap check allows this; any other overlap fails validation.
+  - { id: mixer_running,      db: 10, type: bool,  offset: 10, bit: 0, update_interval_ms: 200, label: "Running", device: "Mixer" }
+  - { id: mixer_alarm,        db: 10, type: bool,  offset: 10, bit: 1, update_interval_ms: 200, label: "Alarm",   device: "Mixer" }
+  - { id: mixer_at_temp,      db: 10, type: bool,  offset: 10, bit: 2, update_interval_ms: 200, label: "At Temp", device: "Mixer" }
+  - { id: mixer_batch_count,  db: 10, type: uint,  offset: 12, update_interval_ms: 500,  label: "Batch Count",    device: "Mixer" }
+  - { id: mixer_recipe,       db: 10, type: usint, offset: 14, update_interval_ms: 500,  label: "Recipe No.",     device: "Mixer" }
+  - { id: mixer_temperature,  db: 10, type: int,   offset: 16, update_interval_ms: 500,  label: "Temperature",    device: "Mixer" }
+  # `time` = signed milliseconds; must start on an even byte.
+  - { id: mixer_mix_time,     db: 10, type: time,  offset: 20, update_interval_ms: 500,  label: "Mix Time",       device: "Mixer" }
+  # Polled only once a second. In Live Trends this updates in visible steps
+  # compared with the 100 ms speed tag.
+  - { id: mixer_cycle_time,   db: 10, type: time,  offset: 24, update_interval_ms: 1000, label: "Cycle Time",     device: "Mixer" }
+
+  # DB 20 -- no `device:`, so these land under "Other" in the Trends
+  # checklist. tank_level also has no `label:`, so its id is shown instead.
+  - { id: tank_level,         db: 20, type: int,   offset: 0,  update_interval_ms: 500 }
+  - { id: pump_on,            db: 20, type: bool,  offset: 2,  bit: 0, update_interval_ms: 200, label: "Pump On" }
+
+# --- 3. Panels and widgets --------------------------------------------------
+# Show: one card per panel. All six widget types appear in the Mixer card.
+panels:
+  - title: "Mixer"
+    # `groups:` splits a card into titled sections.
+    groups:
+      - title: "Commands"   # writable widgets -- the value you set is held
+        widgets:
+          - { type: slider,       tag: mixer_speed_sp, label: "Speed Setpoint (RPM)", min: "0", max: "1500" }
+          - { type: toggle,       tag: mixer_enable }   # no label: uses the tag's label
+          - { type: button,       tag: mixer_start,    label: "Start Batch" }
+          - { type: input_number, tag: mixer_recipe }
+          - { type: input_number, tag: mixer_mix_time, label: "Mix Time (ms)" }
+      - title: "Status"     # read-only widgets -- driven by the PLC
+        widgets:
+          - { type: text_display,  tag: mixer_speed,       label: "Speed",       format: "%.1f RPM" }
+          - { type: text_display,  tag: mixer_temperature, label: "Temperature", format: "%.0f C" }
+          - { type: text_display,  tag: mixer_batch_count, format: "%.0f" }
+          - { type: text_display,  tag: mixer_cycle_time,  label: "Cycle Time",  format: "%.0f ms" }
+          - { type: led_indicator, tag: mixer_running }
+          - { type: led_indicator, tag: mixer_alarm }
+          - { type: led_indicator, tag: mixer_at_temp }
+
+  # Without `groups:`, a card is a plain list of widgets.
+  - title: "Utilities"
+    widgets:
+      - { type: text_display,  tag: tank_level, label: "Tank Level", format: "%.0f L" }
+      - { type: led_indicator, tag: pump_on }
+
+# --- 4. Repeated devices: device_types + devices ----------------------------
+# Describe a device layout once and reuse it for each physical unit. Each
+# device below automatically gets its own tags (conv1_run, conv2_speed, ...),
+# its own card with "Control" and "Status" sections, and its own group in
+# the Trends checklist.
+device_types:
+  conveyor:
+    update_interval_ms: 200
+    fields:
+      - { id: run,      type: bool, offset: 0,  bit: 0, label: "Run",            writable: true, widget: toggle,       group: "Control" }
+      - { id: reset,    type: bool, offset: 1,  bit: 0, label: "Reset",          writable: true, widget: button,       group: "Control" }
+      - { id: speed_sp, type: real, offset: 2,          label: "Speed Setpoint", writable: true, widget: slider,       group: "Control" }
+      - { id: speed,    type: real, offset: 6,          label: "Speed",                          widget: text_display, group: "Status" }
+      - { id: jam,      type: bool, offset: 10, bit: 0, label: "Jam",                            widget: led_indicator, group: "Status" }
+      - { id: count,    type: int,  offset: 12,         label: "Parts Counted",                  widget: text_display, group: "Status" }
+
+devices:
+  # conv1 and conv2 share DB 30; `offset:` shifts conv2's whole layout up
+  # 20 bytes so the two don't overlap.
+  - { type: conveyor, id: conv1, db: 30,             label: "Conveyor 1" }
+  - { type: conveyor, id: conv2, db: 30, offset: 20, label: "Conveyor 2" }
+  # conv3 gets a DB of its own.
+  - { type: conveyor, id: conv3, db: 31,             label: "Conveyor 3" }
+
+# --- 5. Logging + Trends ----------------------------------------------------
+# Show: the Trends tab.
+#   - Live: tick "Mixer > Speed" and "Conveyor 1 > Speed". Live data comes
+#     from memory, so it works even with no sinks configured.
+#   - Last hour / 24h / 7 days: read back from the SQLite sink below. Let
+#     the app run for a minute first so there's some history to show.
+#   - Overlay vs Stacked: all lines on one chart, or one chart per tag.
+#     Tick a bool (Running) together with a real (Speed) to see why
+#     Stacked helps.
+#   - The Speed tags from Conveyor 1, 2 and 3 share one label but appear as
+#     separate lines, because SQLite stores each row's device.
+logging:
+  sinks:
+    - { id: csv_demo,   type: csv,    path: "logs/demo.csv" }
+    - { id: csv_fast,   type: csv,    path: "logs/demo_fast.csv" }
+    - { id: sqlite_demo, type: sqlite, path: "logs/demo.db", table: "demo_readings" }
+    # InfluxDB works the same way. Uncomment if you have a server running.
+    # The token is stored in this file as plain text, so don't commit a real one.
+    # - id: influx_demo
+    #   type: influxdb
+    #   url: "http://localhost:8086"
+    #   token: "my-token"
+    #   org: "my-org"
+    #   bucket: "plc_demo"
+    #   measurement: "plc_readings"   # optional, this is the default
+
+  rules:
+    # An explicit tag list, sent to two sinks every second.
+    - tags: [mixer_speed_sp, mixer_speed, mixer_enable, mixer_running, mixer_alarm, mixer_at_temp,
+             mixer_batch_count, mixer_recipe, mixer_temperature, mixer_mix_time, mixer_cycle_time,
+             tank_level, pump_on]
+      interval_ms: 1000
+      sinks: [csv_demo, sqlite_demo]
+    # `devices:` logs every field of each listed device, with no need to list tags.
+    - devices: [conv1, conv2, conv3]
+      interval_ms: 1000
+      sinks: [sqlite_demo]
+    # A tag can appear in more than one rule: here Speed is also written to
+    # its own CSV file five times a second.
+    - tags: [mixer_speed]
+      interval_ms: 200
+      sinks: [csv_fast]
+    # - devices: [conv1, conv2, conv3]
+    #   interval_ms: 1000
+    #   sinks: [influx_demo]

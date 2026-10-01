@@ -5,6 +5,10 @@
 // values into them -- so plc_gui (pointed at 127.0.0.1) can be exercised
 // end-to-end (connect, read, write, log, trend) without real hardware.
 //
+// Tags bound to a writable widget (slider/input_number/toggle/button) are
+// never animated: they keep whatever plc_gui last wrote, the way a real
+// PLC holds a setpoint, instead of being overwritten on the next tick.
+//
 // Doesn't validate that your DB layout matches a real PLC program -- only
 // that your config's plumbing (connection, polling, logging, trends)
 // actually works.
@@ -18,6 +22,7 @@
 #include <cstdio>
 #include <iostream>
 #include <map>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -25,6 +30,23 @@
 namespace {
 std::atomic<bool> g_stop{false};
 void handleSignal(int) { g_stop = true; }
+
+// Ids of every tag some writable widget points at, across both a panel's
+// flat widgets and its groups (device_types expansion produces groups).
+std::set<std::string> collectWritableTagIds(const std::vector<PanelConfig>& panels) {
+    static const std::set<std::string> kWritableWidgetTypes = {"slider", "input_number", "toggle", "button"};
+    std::set<std::string> ids;
+    auto scan = [&](const std::vector<WidgetConfig>& widgets) {
+        for (const auto& w : widgets) {
+            if (kWritableWidgetTypes.count(w.type)) ids.insert(w.tag);
+        }
+    };
+    for (const auto& panel : panels) {
+        scan(panel.widgets);
+        for (const auto& group : panel.groups) scan(group.widgets);
+    }
+    return ids;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -76,13 +98,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::printf("fake_plc_server: serving %s on 127.0.0.1:102 (%zu tags across %zu DB%s). Ctrl+C to stop.\n",
-                configPath.c_str(), config.tags.size(), dbBuffers.size(), dbBuffers.size() == 1 ? "" : "s");
+    const std::set<std::string> writableTagIds = collectWritableTagIds(config.panels);
+
+    std::printf("fake_plc_server: serving %s on 127.0.0.1:102 (%zu tags across %zu DB%s, %zu held for writes). "
+                "Ctrl+C to stop.\n",
+                configPath.c_str(), config.tags.size(), dbBuffers.size(), dbBuffers.size() == 1 ? "" : "s",
+                writableTagIds.size());
 
     auto start = std::chrono::steady_clock::now();
     while (!g_stop) {
         double elapsedSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
         for (const auto& tag : config.tags) {
+            if (writableTagIds.count(tag.id)) continue;
             auto& buf = dbBuffers[tag.db];
             PlcValue value;
             switch (tag.type) {
