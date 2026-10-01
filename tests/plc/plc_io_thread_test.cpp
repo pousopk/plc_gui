@@ -93,6 +93,33 @@ TEST_CASE("PlcIoThread requestWrite is applied to the PLC") {
     io.stop();
 }
 
+TEST_CASE("PlcIoThread writing a bool leaves the other bits packed into its byte untouched") {
+    std::unique_ptr<TestPlcServer> server;
+    if (!startServerOrSkip(server, 10, 64)) return;
+    // Byte 0 holds three bools: bit 0 and bit 2 already set by the PLC.
+    server->db()[0] = 0b00000101;
+
+    ValueCache cache;
+    std::vector<TagConfig> tags = {
+        makeTag("in", 10, PlcType::Bool, 0, 20, 0),
+        makeTag("reset", 10, PlcType::Bool, 0, 20, 1),
+        makeTag("trigger", 10, PlcType::Bool, 0, 20, 2),
+    };
+    PlcIoThread io(fastReconnectConfig(), tags, cache);
+    io.start();
+    REQUIRE(waitUntil([&] { return io.connectionState() == ConnectionState::Connected; }, 1000));
+
+    io.requestWrite("reset", true);
+    REQUIRE(waitUntil([&] { return (server->db()[0] & 0b010) != 0; }, 500));
+    CHECK(server->db()[0] == 0b00000111);
+
+    io.requestWrite("in", false);
+    REQUIRE(waitUntil([&] { return (server->db()[0] & 0b001) == 0; }, 500));
+    CHECK(server->db()[0] == 0b00000110);
+
+    io.stop();
+}
+
 TEST_CASE("PlcIoThread marks values stale on disconnect and clears staleness on reconnect") {
     std::unique_ptr<TestPlcServer> server;
     if (!startServerOrSkip(server, 10, 64)) return;

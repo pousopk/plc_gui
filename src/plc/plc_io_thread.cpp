@@ -92,16 +92,26 @@ void PlcIoThread::drainWriteQueue() {
         buffers.reserve(batch.size());
 
         for (const auto& tag : batch) {
-            int size = plcTypeByteSize(tag.type);
-            buffers.emplace_back(static_cast<size_t>(size), 0);
-            encodePlcValue(tag.type, valueByTagId[tag.id], buffers.back().data(), 0, tag.bit);
-
             TS7DataItem item{};
             item.Area = S7AreaDB;
-            item.WordLen = S7WLByte;
             item.DBNumber = tag.db;
-            item.Start = tag.offset;
-            item.Amount = size;
+            if (tag.type == PlcType::Bool) {
+                // Bit-level write: a whole-byte write would also overwrite
+                // every other bool packed into the same byte (e.g. writing
+                // "reset" at bit 1 would clear "in" at bit 0). For S7WLBit,
+                // Start is a bit address and the payload is one 0/1 byte.
+                buffers.emplace_back(1, std::get<bool>(valueByTagId[tag.id]) ? 1 : 0);
+                item.WordLen = S7WLBit;
+                item.Start = tag.offset * 8 + tag.bit;
+                item.Amount = 1;
+            } else {
+                int size = plcTypeByteSize(tag.type);
+                buffers.emplace_back(static_cast<size_t>(size), 0);
+                encodePlcValue(tag.type, valueByTagId[tag.id], buffers.back().data(), 0, tag.bit);
+                item.WordLen = S7WLByte;
+                item.Start = tag.offset;
+                item.Amount = size;
+            }
             item.pdata = buffers.back().data();
             items.push_back(item);
         }
