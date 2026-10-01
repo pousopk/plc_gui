@@ -2,6 +2,7 @@
 #include "config/config_types.hpp"
 #include "plc/plc_client.hpp"
 #include "plc/poll_group.hpp"
+#include "plc/trend_buffer.hpp"
 #include "plc/value_cache.hpp"
 #include <atomic>
 #include <chrono>
@@ -17,7 +18,8 @@ enum class ConnectionState { Disconnected, Connecting, Connected, Reconnecting }
 // lifetime. Safe to call requestWrite()/connectionState() from any thread.
 class PlcIoThread {
 public:
-    PlcIoThread(PlcConnectionConfig plcConfig, std::vector<TagConfig> tags, ValueCache& cache);
+    PlcIoThread(PlcConnectionConfig plcConfig, std::vector<TagConfig> tags, ValueCache& cache,
+                TrendBuffer* trendBuffer = nullptr);
     ~PlcIoThread();
     PlcIoThread(const PlcIoThread&) = delete;
     PlcIoThread& operator=(const PlcIoThread&) = delete;
@@ -41,6 +43,7 @@ private:
     std::vector<PollGroup> pollGroups_;
     std::vector<std::chrono::steady_clock::time_point> nextDue_;
     ValueCache& cache_;
+    TrendBuffer* trendBuffer_ = nullptr;
 
     PlcClient client_;
     std::atomic<ConnectionState> state_{ConnectionState::Disconnected};

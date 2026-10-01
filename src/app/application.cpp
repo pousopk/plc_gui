@@ -3,7 +3,9 @@
 #include "logging/influx_log_sink.hpp"
 #include "logging/log_manager.hpp"
 #include "logging/sqlite_log_sink.hpp"
+#include "logging/trend_history_query.hpp"
 #include "plc/plc_io_thread.hpp"
+#include "plc/trend_buffer.hpp"
 #include "plc/value_cache.hpp"
 #include "ui/app_window.hpp"
 #include "ui/panel_factory.hpp"
@@ -64,7 +66,8 @@ Application::Application(AppConfig config, bool headless)
 
 int Application::run() {
     ValueCache cache;
-    PlcIoThread io(config_.plc, config_.tags, cache);
+    TrendBuffer trendBuffer;
+    PlcIoThread io(config_.plc, config_.tags, cache, &trendBuffer);
     LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache,
                            buildTagLabels(config_.tags), buildTagDevices(config_.tags));
 
@@ -85,7 +88,17 @@ int Application::run() {
         cv.wait(lock, [&] { return stopFlag.load(); });
     } else {
         auto panels = PanelFactory::build(config_.panels, config_.tags);
-        AppWindow window(config_.plc.name, std::move(panels), cache, io);
+
+        std::unique_ptr<TrendHistoryQuery> historyQuery;
+        for (const auto& sink : config_.logging.sinks) {
+            if (sink.type == "sqlite") {
+                historyQuery = std::make_unique<TrendHistoryQuery>(sink.path, sink.table);
+                break;
+            }
+        }
+
+        AppWindow window(config_.plc.name, std::move(panels), cache, io,
+                          config_.tags, trendBuffer, historyQuery.get());
         window.run();
     }
 

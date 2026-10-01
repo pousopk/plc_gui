@@ -17,6 +17,8 @@ set(PLC_GUI_TEST_SOURCES
     plc/poll_group_test.cpp
     ${CMAKE_SOURCE_DIR}/src/plc/poll_group.cpp
     plc/value_cache_test.cpp
+    plc/trend_buffer_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/plc/trend_buffer.cpp
     plc/plc_io_thread_test.cpp
     ${CMAKE_SOURCE_DIR}/src/plc/plc_io_thread.cpp
     logging/csv_log_sink_test.cpp
@@ -27,7 +29,12 @@ set(PLC_GUI_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/logging/influx_log_sink.cpp
     logging/log_manager_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/log_manager.cpp
+    logging/trend_history_query_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/logging/trend_history_query.cpp
     ui/panel_factory_test.cpp
+    ui/implot_smoke_test.cpp
+    ui/trends_screen_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/trends_screen.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/widgets/slider_widget.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/widgets/input_number_widget.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/widgets/toggle_widget.cpp
@@ -42,6 +49,7 @@ target_link_libraries(plc_gui_tests PRIVATE
     doctest::doctest
     yaml-cpp::yaml-cpp
     imgui
+    implot
     snap7_static
     SQLite::SQLite3
     CURL::libcurl

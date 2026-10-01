@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include "plc/plc_io_thread.hpp"
+#include "plc/trend_buffer.hpp"
 #include "support/test_plc_server.hpp"
 #include <chrono>
 #include <functional>
@@ -127,5 +128,38 @@ TEST_CASE("PlcIoThread marks values stale on disconnect and clears staleness on 
 
     CHECK(std::get<float>(cache.snapshot()->at("speed").value) == doctest::Approx(2.0f));
 
+    io.stop();
+}
+
+TEST_CASE("PlcIoThread appends decoded values to the trend buffer when one is provided") {
+    std::unique_ptr<TestPlcServer> server;
+    if (!startServerOrSkip(server, 10, 64)) return;
+    encodePlcValue(PlcType::Real, 3.5f, server->db(), 0, 0);
+
+    ValueCache cache;
+    TrendBuffer trendBuffer;
+    std::vector<TagConfig> tags = {makeTag("speed", 10, PlcType::Real, 0, 20)};
+    PlcIoThread io(fastReconnectConfig(), tags, cache, &trendBuffer);
+    io.start();
+
+    bool ok = waitUntil([&] { return !trendBuffer.snapshot("speed").empty(); }, 1000);
+    REQUIRE(ok);
+
+    auto samples = trendBuffer.snapshot("speed");
+    CHECK(std::get<float>(samples.back().value) == doctest::Approx(3.5f));
+
+    io.stop();
+}
+
+TEST_CASE("PlcIoThread works with no trend buffer at all (default nullptr)") {
+    std::unique_ptr<TestPlcServer> server;
+    if (!startServerOrSkip(server, 10, 64)) return;
+
+    ValueCache cache;
+    std::vector<TagConfig> tags = {makeTag("speed", 10, PlcType::Real, 0, 20)};
+    PlcIoThread io(fastReconnectConfig(), tags, cache); // unchanged 3-arg call site
+    io.start();
+
+    REQUIRE(waitUntil([&] { return cache.snapshot()->count("speed") == 1; }, 1000));
     io.stop();
 }

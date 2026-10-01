@@ -15,6 +15,7 @@ public:
 private:
     void flush();
     void execOrThrow(const std::string& sql);
+    void migrateDeviceColumn();
 
     std::string path_;
     std::string table_;

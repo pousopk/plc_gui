@@ -2,8 +2,9 @@
 #include <algorithm>
 #include <iostream>
 
-PlcIoThread::PlcIoThread(PlcConnectionConfig plcConfig, std::vector<TagConfig> tags, ValueCache& cache)
-    : plcConfig_(std::move(plcConfig)), tags_(std::move(tags)), cache_(cache) {
+PlcIoThread::PlcIoThread(PlcConnectionConfig plcConfig, std::vector<TagConfig> tags, ValueCache& cache,
+                          TrendBuffer* trendBuffer)
+    : plcConfig_(std::move(plcConfig)), tags_(std::move(tags)), cache_(cache), trendBuffer_(trendBuffer) {
     for (const auto& t : tags_) tagsById_[t.id] = t;
     pollGroups_ = buildPollGroups(tags_);
     nextDue_.assign(pollGroups_.size(), std::chrono::steady_clock::now());
@@ -153,10 +154,12 @@ void PlcIoThread::pollGroup(const PollGroup& group) {
         auto current = cache_.snapshot();
         auto next = std::make_shared<ValueMap>(*current);
         auto now = std::chrono::steady_clock::now();
+        auto wallNow = std::chrono::system_clock::now();
         for (size_t i = 0; i < batch.size(); ++i) {
             const TagConfig& tag = batch[i];
             PlcValue value = decodePlcValue(tag.type, buffers[i].data(), 0, tag.bit);
             (*next)[tag.id] = CachedValue{value, false, now};
+            if (trendBuffer_) trendBuffer_->append(tag.id, wallNow, value);
         }
         cache_.publish(next);
     }

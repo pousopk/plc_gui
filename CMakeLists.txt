@@ -50,6 +50,21 @@ target_include_directories(imgui PUBLIC
 )
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
+# --- ImPlot (built on top of Dear ImGui; no CMake support upstream) ---
+FetchContent_Declare(
+  implot
+  GIT_REPOSITORY https://github.com/epezent/implot.git
+  GIT_TAG        v1.0
+)
+FetchContent_MakeAvailable(implot)
+
+add_library(implot STATIC
+  ${implot_SOURCE_DIR}/implot.cpp
+  ${implot_SOURCE_DIR}/implot_items.cpp
+)
+target_include_directories(implot PUBLIC ${implot_SOURCE_DIR})
+target_link_libraries(implot PUBLIC imgui)
+
 # --- Snap7 (vendored source, hand-written build — see cmake/snap7.cmake) ---
 include(cmake/snap7.cmake)
 
@@ -66,11 +81,13 @@ set(PLC_GUI_SOURCES
     src/config/config_loader.cpp
     src/plc/plc_client.cpp
     src/plc/poll_group.cpp
+    src/plc/trend_buffer.cpp
     src/plc/plc_io_thread.cpp
     src/logging/csv_log_sink.cpp
     src/logging/sqlite_log_sink.cpp
     src/logging/influx_log_sink.cpp
     src/logging/log_manager.cpp
+    src/logging/trend_history_query.cpp
     src/ui/widgets/slider_widget.cpp
     src/ui/widgets/input_number_widget.cpp
     src/ui/widgets/toggle_widget.cpp
@@ -78,6 +95,7 @@ set(PLC_GUI_SOURCES
     src/ui/widgets/text_display_widget.cpp
     src/ui/widgets/led_indicator_widget.cpp
     src/ui/panel_factory.cpp
+    src/ui/trends_screen.cpp
     src/ui/app_window.cpp
     src/app/application.cpp
 )
@@ -86,6 +104,7 @@ add_executable(plc_gui ${PLC_GUI_SOURCES})
 target_link_libraries(plc_gui PRIVATE
     yaml-cpp::yaml-cpp
     imgui
+    implot
     snap7_static
     SQLite::SQLite3
     CURL::libcurl
