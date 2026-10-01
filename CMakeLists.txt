@@ -112,8 +112,13 @@ target_link_libraries(plc_gui PRIVATE
 )
 target_include_directories(plc_gui PRIVATE src)
 
-add_executable(fake_plc_server tools/fake_plc_server.cpp)
-target_link_libraries(fake_plc_server PRIVATE snap7_static Threads::Threads)
+add_executable(fake_plc_server
+    tools/fake_plc_server.cpp
+    src/config/config_loader.cpp
+    src/plc/plc_value.cpp
+)
+target_link_libraries(fake_plc_server PRIVATE snap7_static yaml-cpp::yaml-cpp Threads::Threads)
+target_include_directories(fake_plc_server PRIVATE src)
 
 enable_testing()
 add_subdirectory(tests)

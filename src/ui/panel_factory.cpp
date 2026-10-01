@@ -35,7 +35,16 @@ std::unique_ptr<IWidget> buildWidget(const WidgetConfig& wc, const std::unordere
     if (factoryIt == widgetRegistry().end()) {
         throw std::runtime_error("PanelFactory: unknown widget type '" + wc.type + "'");
     }
-    return factoryIt->second(wc, tagIt->second);
+    try {
+        return factoryIt->second(wc, tagIt->second);
+    } catch (const std::exception& e) {
+        // Widget constructors parse numeric params (e.g. a slider's min/max)
+        // via std::stof/std::stoi, whose exceptions carry no context beyond
+        // "stof" -- naming the widget/tag here is the only way to tell which
+        // config line is actually broken.
+        throw std::runtime_error("PanelFactory: widget '" + wc.type + "' for tag '" + wc.tag +
+                                  "' has an invalid parameter: " + e.what());
+    }
 }
 
 } // namespace

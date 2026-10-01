@@ -29,9 +29,24 @@ TEST_CASE("CsvLogSink writes a header once and appends rows in long format") {
     }
 
     std::string content = readFile(path);
-    CHECK(content.find("timestamp,tag_id,value,stale\n") == 0);
-    CHECK(content.find("tag1,42,false") != std::string::npos);
-    CHECK(content.find("tag2,true,true") != std::string::npos);
+    CHECK(content.find("timestamp,tag_id,value,stale,device\n") == 0);
+    CHECK(content.find("tag1,42,false,") != std::string::npos);
+    CHECK(content.find("tag2,true,true,") != std::string::npos);
+
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("CsvLogSink writes each row's device") {
+    auto path = tempCsvPath();
+    CsvLogSink sink(path);
+    sink.open();
+    sink.writeRow(std::chrono::system_clock::time_point{},
+                   {{"finished", true, false, "Camera 1"}, {"finished", false, false, "Camera 2"}});
+    sink.close();
+
+    std::string content = readFile(path);
+    CHECK(content.find("finished,true,false,Camera 1") != std::string::npos);
+    CHECK(content.find("finished,false,false,Camera 2") != std::string::npos);
 
     std::filesystem::remove(path);
 }

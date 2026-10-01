@@ -14,7 +14,7 @@ void CsvLogSink::open() {
 
     file_.open(path_, std::ios::app);
     if (isNew) {
-        file_ << "timestamp,tag_id,value,stale\n";
+        file_ << "timestamp,tag_id,value,stale,device\n";
         file_.flush();
     }
 }
@@ -23,7 +23,7 @@ void CsvLogSink::writeRow(std::chrono::system_clock::time_point ts, const std::v
     std::string tsStr = formatTimestamp(ts);
     for (const auto& v : values) {
         file_ << tsStr << ',' << v.tagId << ',' << formatPlcValue(v.value) << ','
-              << (v.stale ? "true" : "false") << '\n';
+              << (v.stale ? "true" : "false") << ',' << v.device << '\n';
     }
     if (++bufferedRows_ >= flushEveryNRows_) flush();
 }

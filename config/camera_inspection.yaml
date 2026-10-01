@@ -61,8 +61,8 @@ device_types:
       # (momentary buttons — write once per click); Timeout is a plain
       # numeric input in milliseconds.
       - { id: in, type: bool, offset: 0, bit: 0, label: "In", writable: true, widget: toggle, group: "Inputs" }
-      - { id: reset, type: bool, offset: 0, bit: 1, label: "Reset", writable: true, widget: button, group: "Inputs" }
-      - { id: trigger_software, type: bool, offset: 0, bit: 2, label: "Trigger Software", writable: true, widget: button, group: "Inputs" }
+      - { id: reset, type: bool, offset: 0, bit: 1, label: "Reset", writable: true, widget: toggle, group: "Inputs" }
+      - { id: trigger_software, type: bool, offset: 0, bit: 2, label: "Trigger Software", writable: true, widget: toggle, group: "Inputs" }
       - { id: timeout, type: time, offset: 2, label: "Timeout (ms)", writable: true, widget: input_number, group: "Inputs" }
       # VAR_OUTPUT — read-only monitoring; the PLC drives these.
       - { id: finished, type: bool, offset: 6, bit: 0, label: "Finished", widget: led_indicator, group: "Outputs" }
@@ -79,10 +79,6 @@ devices:
     id: cam1
     db: 1
     label: "Camera 1"
-  - type: camera_inspection
-    id: cam2
-    db: 3
-    label: "Camera 2"
 
 logging:
   sinks:
@@ -106,6 +102,6 @@ logging:
   rules:
     # Add a new camera's id here too, once it exists — every one of its
     # fields gets logged automatically, no need to list them individually.
-    - devices: [cam1, cam2]
+    - devices: [cam1]
       interval_ms: 1000
       sinks: [csv_main, sqlite_main, influx_main]

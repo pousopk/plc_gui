@@ -1,9 +1,24 @@
+// A config-driven in-process Snap7 server standing in for real PLC
+// hardware. Loads the same YAML config plc_gui would use, registers one
+// server area per distinct DB the config's tags reference (sized to cover
+// every tag's byte range), and continuously writes synthetic-but-changing
+// values into them -- so plc_gui (pointed at 127.0.0.1) can be exercised
+// end-to-end (connect, read, write, log, trend) without real hardware.
+//
+// Doesn't validate that your DB layout matches a real PLC program -- only
+// that your config's plumbing (connection, polling, logging, trends)
+// actually works.
+#include "config/config_loader.hpp"
+#include "plc/plc_value.hpp"
 #include <snap7.h>
 #include <atomic>
 #include <chrono>
-#include <cstdio>
-#include <cstring>
+#include <cmath>
 #include <csignal>
+#include <cstdio>
+#include <iostream>
+#include <map>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -12,21 +27,45 @@ std::atomic<bool> g_stop{false};
 void handleSignal(int) { g_stop = true; }
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
 
-    std::vector<unsigned char> db10(64, 0);
-    unsigned char speedBytes[4] = {0x42, 0x28, 0x00, 0x00}; // big-endian float 42.0
-    std::memcpy(db10.data(), speedBytes, 4);
-    db10[4] = 0x01; // motor1_running = true (bit 0)
+    std::string configPath = "config/plc.yaml";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--config" && i + 1 < argc) configPath = argv[++i];
+    }
 
-    std::vector<unsigned char> db20(64, 0); // tank_level (INT @ offset 0)
+    AppConfig config;
+    try {
+        config = ConfigLoader::load(configPath);
+    } catch (const ConfigError& e) {
+        std::cerr << "fake_plc_server: config error: " << e.what() << "\n";
+        return 1;
+    }
+
+    if (config.tags.empty()) {
+        std::cerr << "fake_plc_server: " << configPath << " has no tags -- nothing to serve\n";
+        return 1;
+    }
+
+    // One buffer per distinct DB, sized to cover every tag's byte range.
+    std::map<int, std::vector<uint8_t>> dbBuffers;
+    for (const auto& tag : config.tags) {
+        int end = tag.offset + plcTypeByteSize(tag.type);
+        auto& buf = dbBuffers[tag.db];
+        if (static_cast<int>(buf.size()) < end) buf.resize(static_cast<size_t>(end), 0);
+    }
 
     S7Object server = Srv_Create();
-    Srv_RegisterArea(server, srvAreaDB, 10, db10.data(), static_cast<int>(db10.size()));
-    Srv_RegisterArea(server, srvAreaDB, 20, db20.data(), static_cast<int>(db20.size()));
+    for (auto& [db, buf] : dbBuffers) {
+        Srv_RegisterArea(server, srvAreaDB, static_cast<word>(db), buf.data(), static_cast<int>(buf.size()));
+    }
 
+    // Always loopback-only, regardless of the config's own plc.ip -- that
+    // field is for the real PLC; point plc_gui at 127.0.0.1 yourself (e.g.
+    // a temp copy of your config) to talk to this fake server instead.
     int rc = Srv_StartTo(server, "127.0.0.1");
     if (rc != 0) {
         std::fprintf(stderr,
@@ -37,12 +76,30 @@ int main() {
         return 1;
     }
 
-    std::printf("fake_plc_server: listening on 127.0.0.1:102 (DB10, DB20). Ctrl+C to stop.\n");
-    int counter = 0;
+    std::printf("fake_plc_server: serving %s on 127.0.0.1:102 (%zu tags across %zu DB%s). Ctrl+C to stop.\n",
+                configPath.c_str(), config.tags.size(), dbBuffers.size(), dbBuffers.size() == 1 ? "" : "s");
+
+    auto start = std::chrono::steady_clock::now();
     while (!g_stop) {
-        int16_t level = static_cast<int16_t>((++counter / 10) % 1000);
-        db20[0] = static_cast<unsigned char>((level >> 8) & 0xFF);
-        db20[1] = static_cast<unsigned char>(level & 0xFF);
+        double elapsedSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        for (const auto& tag : config.tags) {
+            auto& buf = dbBuffers[tag.db];
+            PlcValue value;
+            switch (tag.type) {
+                case PlcType::Bool:
+                    // Slow toggle so a "constantly on/off" signal and an
+                    // actual transition are both easy to spot in the GUI.
+                    value = (static_cast<int>(elapsedSeconds / 3.0) % 2) == 0;
+                    break;
+                case PlcType::Real:
+                    value = static_cast<float>(50.0 + 50.0 * std::sin(elapsedSeconds));
+                    break;
+                default: // Int, UInt, USInt, Time -- a wrapping counter is enough to show movement
+                    value = static_cast<int32_t>(static_cast<long long>(elapsedSeconds * 10) % 1000);
+                    break;
+            }
+            encodePlcValue(tag.type, value, buf.data(), tag.offset, tag.bit);
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 

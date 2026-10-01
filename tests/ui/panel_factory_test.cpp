@@ -126,3 +126,19 @@ TEST_CASE("PanelFactory throws when a widget references a tag not in the tag lis
 
     CHECK_THROWS_AS(PanelFactory::build({panel}, {}), std::runtime_error);
 }
+
+TEST_CASE("PanelFactory names the widget and tag when a numeric param fails to parse") {
+    std::vector<TagConfig> tags = {makeTag("speed", PlcType::Real)};
+
+    PanelConfig panel;
+    panel.title = "P";
+    WidgetConfig slider;
+    slider.type = "slider";
+    slider.tag = "speed";
+    slider.params = {{"min", "not_a_number"}, {"max", "100"}};
+    panel.widgets = {slider};
+
+    CHECK_THROWS_WITH_AS(PanelFactory::build({panel}, tags),
+                          doctest::Contains("widget 'slider' for tag 'speed' has an invalid parameter"),
+                          std::runtime_error);
+}

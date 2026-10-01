@@ -114,6 +114,9 @@ struct DeviceInstance {
     std::string type;
     std::string id;
     int db;
+    int offset = 0; // added to every field's blueprint offset; lets several
+                     // instances of the same device_type share one DB at
+                     // different byte offsets, instead of one DB each
     std::string label;
 };
 
@@ -173,6 +176,7 @@ std::vector<DeviceInstance> parseDevices(const YAML::Node& root) {
         d.type = requireNode(item, "type", ctx).as<std::string>();
         d.id = requireNode(item, "id", ctx).as<std::string>();
         d.db = requireNode(item, "db", ctx).as<int>();
+        d.offset = item["offset"] ? item["offset"].as<int>() : 0;
         d.label = requireNode(item, "label", ctx).as<std::string>();
         if (!seenIds.insert(d.id).second) {
             fail(ctx + ".id", "duplicate device id '" + d.id + "' (each device needs a distinct id)");
@@ -203,7 +207,7 @@ void expandDevices(const std::map<std::string, DeviceTypeBlueprint>& deviceTypes
             tag.id = device.id + "_" + field.id;
             tag.db = device.db;
             tag.type = field.type;
-            tag.offset = field.offset;
+            tag.offset = field.offset + device.offset;
             tag.bit = field.bit;
             tag.updateIntervalMs = blueprint.updateIntervalMs;
             tag.label = field.label;
@@ -325,6 +329,44 @@ LoggingConfig parseLogging(const YAML::Node& root,
     return logging;
 }
 
+// Two tags in the same DB whose byte ranges [offset, offset + size) overlap
+// almost always mean a copy-paste offset mistake -- except two Bool tags at
+// the same offset with different bit numbers, which is ordinary bit-packing
+// (e.g. "in"/"reset"/"trigger_software" all living in byte 0 of a struct).
+void validateTagLayout(const std::vector<TagConfig>& tags) {
+    std::set<std::string> seenIds;
+    for (size_t i = 0; i < tags.size(); ++i) {
+        if (!seenIds.insert(tags[i].id).second) {
+            fail("tags[" + std::to_string(i) + "].id", "duplicate tag id '" + tags[i].id + "'");
+        }
+    }
+
+    std::map<int, std::vector<size_t>> indicesByDb;
+    for (size_t i = 0; i < tags.size(); ++i) indicesByDb[tags[i].db].push_back(i);
+
+    for (const auto& [db, indices] : indicesByDb) {
+        for (size_t a = 0; a < indices.size(); ++a) {
+            for (size_t b = a + 1; b < indices.size(); ++b) {
+                const TagConfig& t1 = tags[indices[a]];
+                const TagConfig& t2 = tags[indices[b]];
+                int start1 = t1.offset, end1 = t1.offset + plcTypeByteSize(t1.type);
+                int start2 = t2.offset, end2 = t2.offset + plcTypeByteSize(t2.type);
+                bool overlaps = start1 < end2 && start2 < end1;
+                if (!overlaps) continue;
+
+                bool bothBoolSameOffsetDifferentBit = t1.type == PlcType::Bool && t2.type == PlcType::Bool &&
+                    t1.offset == t2.offset && t1.bit != t2.bit;
+                if (bothBoolSameOffsetDifferentBit) continue;
+
+                std::ostringstream oss;
+                oss << "tag '" << t1.id << "' (db " << db << ", offset " << t1.offset
+                    << ") overlaps tag '" << t2.id << "' (db " << db << ", offset " << t2.offset << ")";
+                fail("tags", oss.str());
+            }
+        }
+    }
+}
+
 void validateReferences(const AppConfig& cfg) {
     std::set<std::string> tagIds;
     for (const auto& t : cfg.tags) tagIds.insert(t.id);
@@ -385,6 +427,7 @@ AppConfig ConfigLoader::load(const std::string& path) {
     expandDevices(deviceTypes, devices, cfg); // appends to cfg.tags / cfg.panels
 
     cfg.logging = parseLogging(root, deviceTypes, devices);
+    validateTagLayout(cfg.tags);
     validateReferences(cfg);
     return cfg;
 }

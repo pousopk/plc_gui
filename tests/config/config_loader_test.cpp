@@ -477,6 +477,57 @@ TEST_CASE("ConfigLoader expands a logging rule's devices list into every field o
     std::remove(path.c_str());
 }
 
+TEST_CASE("ConfigLoader offsets every field of a device instance by its own base offset") {
+    auto path = writeTempYaml(R"YAML(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+device_types:
+  inspection_result:
+    update_interval_ms: 200
+    fields:
+      - { id: frame_counter, type: uint, offset: 0, label: "Frame Counter", widget: text_display, group: "Header" }
+devices:
+  - { type: inspection_result, id: insp1, db: 2, offset: 0, label: "Inspection 1" }
+  - { type: inspection_result, id: insp2, db: 2, offset: 130, label: "Inspection 2" }
+logging: { sinks: [], rules: [] }
+)YAML");
+    AppConfig cfg = ConfigLoader::load(path);
+
+    REQUIRE(cfg.tags.size() == 2);
+    auto find = [&](const std::string& id) -> const TagConfig* {
+        for (const auto& t : cfg.tags) if (t.id == id) return &t;
+        return nullptr;
+    };
+
+    const TagConfig* insp1 = find("insp1_frame_counter");
+    REQUIRE(insp1 != nullptr);
+    CHECK(insp1->db == 2);
+    CHECK(insp1->offset == 0);
+
+    const TagConfig* insp2 = find("insp2_frame_counter");
+    REQUIRE(insp2 != nullptr);
+    CHECK(insp2->db == 2);
+    CHECK(insp2->offset == 130);
+
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader defaults a device instance's base offset to 0 when omitted") {
+    auto path = writeTempYaml(kDeviceBlueprintConfig);
+    AppConfig cfg = ConfigLoader::load(path);
+
+    auto find = [&](const std::string& id) -> const TagConfig* {
+        for (const auto& t : cfg.tags) if (t.id == id) return &t;
+        return nullptr;
+    };
+    const TagConfig* cam1In = find("cam1_in");
+    REQUIRE(cam1In != nullptr);
+    CHECK(cam1In->offset == 0);
+
+    std::remove(path.c_str());
+}
+
 TEST_CASE("ConfigLoader rejects a device instance referencing an unknown device type") {
     auto path = writeTempYaml(R"YAML(
 plc: { ip: "1.2.3.4" }
@@ -595,5 +646,72 @@ logging: { sinks: [], rules: [] }
     CHECK(cfg.panels[0].title == "Manual Panel");
     CHECK(cfg.panels[1].title == "Camera 1");
 
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects two tags sharing the same id") {
+    auto path = writeTempYaml(R"(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: dup, db: 1, type: int, offset: 0, update_interval_ms: 100 }
+  - { id: dup, db: 1, type: int, offset: 10, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)");
+    CHECK_THROWS_WITH_AS(ConfigLoader::load(path), doctest::Contains("duplicate tag id 'dup'"), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects two tags in the same DB with overlapping byte ranges") {
+    auto path = writeTempYaml(R"(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: a_real, db: 1, type: real, offset: 0, update_interval_ms: 100 }
+  - { id: b_int, db: 1, type: int, offset: 2, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects two Bool tags at the same offset and bit") {
+    auto path = writeTempYaml(R"(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: a_bool, db: 1, type: bool, offset: 0, bit: 0, update_interval_ms: 100 }
+  - { id: b_bool, db: 1, type: bool, offset: 0, bit: 0, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader allows multiple Bool tags packed into the same byte at different bits") {
+    auto path = writeTempYaml(R"(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: a_bool, db: 1, type: bool, offset: 0, bit: 0, update_interval_ms: 100 }
+  - { id: b_bool, db: 1, type: bool, offset: 0, bit: 1, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)");
+    AppConfig cfg = ConfigLoader::load(path); // must not throw -- ordinary bit-packing
+    CHECK(cfg.tags.size() == 2);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader allows identical offsets/types across different DBs") {
+    auto path = writeTempYaml(R"(
+plc: { ip: "1.2.3.4" }
+tags:
+  - { id: a_real, db: 1, type: real, offset: 0, update_interval_ms: 100 }
+  - { id: b_real, db: 2, type: real, offset: 0, update_interval_ms: 100 }
+panels: []
+logging: { sinks: [], rules: [] }
+)");
+    AppConfig cfg = ConfigLoader::load(path); // must not throw -- different DBs, no real overlap
+    CHECK(cfg.tags.size() == 2);
     std::remove(path.c_str());
 }

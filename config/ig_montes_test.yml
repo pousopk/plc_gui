@@ -1,0 +1,101 @@
+# Reads the 4 instances of the CAMERA_INSPECTION detection-result struct out
+# of DB2, one struct per 130-byte slot (offsets 0 / 130 / 260 / 390).
+#
+# Offsets below are the REFERENCE layout for standard (non-optimized) access,
+# computed from S7 struct-packing rules (consecutive byte-sized fields pack
+# back-to-back; 4-byte Real fields need even byte alignment). Header_Padding
+# (Word) and Data_Padding (Byte) are alignment filler only -- they aren't
+# read as tags, but they do shift every field after them, so they're baked
+# into the offsets below rather than declared as tags themselves.
+#
+# Run this as its own plc_gui process, separate from camera_inspection.yaml:
+#   plc_gui --config config/inspection_result.yaml
+#
+# HOW TO ADD ANOTHER INSTANCE: add a new entry under devices: with its own
+# `offset:` (the byte where that instance's struct starts within DB2), then
+# add its id to the logging rule's devices: list below.
+
+plc:
+  name: "PLC 1"
+  ip: "192.168.1.160"
+  rack: 0
+  slot: 1
+  connect_timeout_ms: 2000
+  reconnect_backoff_ms: [500, 1000, 2000, 5000]
+
+device_types:
+  inspection_result:
+    update_interval_ms: 100
+    fields:
+      # Read-only detection-result fields -- the PLC/vision system writes
+      # these, the app only reads/logs/displays them.
+      - { id: frame_counter, type: uint, offset: 0, label: "Frame Counter", widget: text_display, group: "Header" }
+      - { id: conditions_length, type: uint, offset: 2, label: "Conditions Length", widget: text_display, group: "Header" }
+      - { id: measurements_length, type: uint, offset: 4, label: "Measurements Length", widget: text_display, group: "Header" }
+      - { id: global_result, type: usint, offset: 8, label: "Global Result", widget: text_display, group: "Header" }
+      - { id: class_classification, type: uint, offset: 10, label: "Class Classification", widget: text_display, group: "Header" }
+      - { id: class_detection, type: uint, offset: 12, label: "Class Detection", widget: text_display, group: "Header" }
+      - { id: detection_appearances, type: uint, offset: 14, label: "Detection Appearances", widget: text_display, group: "Header" }
+      - { id: condition_1, type: usint, offset: 16, label: "Condition 1", widget: text_display, group: "Conditions" }
+      - { id: condition_2, type: usint, offset: 17, label: "Condition 2", widget: text_display, group: "Conditions" }
+      - { id: condition_3, type: usint, offset: 18, label: "Condition 3", widget: text_display, group: "Conditions" }
+      - { id: condition_4, type: usint, offset: 19, label: "Condition 4", widget: text_display, group: "Conditions" }
+      - { id: condition_5, type: usint, offset: 20, label: "Condition 5", widget: text_display, group: "Conditions" }
+      - { id: condition_6, type: usint, offset: 21, label: "Condition 6", widget: text_display, group: "Conditions" }
+      - { id: condition_7, type: usint, offset: 22, label: "Condition 7", widget: text_display, group: "Conditions" }
+      - { id: condition_8, type: usint, offset: 23, label: "Condition 8", widget: text_display, group: "Conditions" }
+      - { id: condition_9, type: usint, offset: 24, label: "Condition 9", widget: text_display, group: "Conditions" }
+      - { id: condition_10, type: usint, offset: 25, label: "Condition 10", widget: text_display, group: "Conditions" }
+      - { id: condition_11, type: usint, offset: 26, label: "Condition 11", widget: text_display, group: "Conditions" }
+      - { id: condition_12, type: usint, offset: 27, label: "Condition 12", widget: text_display, group: "Conditions" }
+      - { id: condition_13, type: usint, offset: 28, label: "Condition 13", widget: text_display, group: "Conditions" }
+      - { id: condition_14, type: usint, offset: 29, label: "Condition 14", widget: text_display, group: "Conditions" }
+      - { id: condition_15, type: usint, offset: 30, label: "Condition 15", widget: text_display, group: "Conditions" }
+      - { id: condition_16, type: usint, offset: 31, label: "Condition 16", widget: text_display, group: "Conditions" }
+      - { id: condition_17, type: usint, offset: 32, label: "Condition 17", widget: text_display, group: "Conditions" }
+      - { id: condition_18, type: usint, offset: 33, label: "Condition 18", widget: text_display, group: "Conditions" }
+      - { id: condition_19, type: usint, offset: 34, label: "Condition 19", widget: text_display, group: "Conditions" }
+      - { id: condition_20, type: usint, offset: 35, label: "Condition 20", widget: text_display, group: "Conditions" }
+      - { id: measure_1, type: real, offset: 36, label: "Measure 1", widget: text_display, group: "Measurements" }
+      - { id: measure_2, type: real, offset: 40, label: "Measure 2", widget: text_display, group: "Measurements" }
+      - { id: measure_3, type: real, offset: 44, label: "Measure 3", widget: text_display, group: "Measurements" }
+      - { id: measure_4, type: real, offset: 48, label: "Measure 4", widget: text_display, group: "Measurements" }
+      - { id: measure_5, type: real, offset: 52, label: "Measure 5", widget: text_display, group: "Measurements" }
+      - { id: measure_6, type: real, offset: 56, label: "Measure 6", widget: text_display, group: "Measurements" }
+      - { id: measure_7, type: real, offset: 60, label: "Measure 7", widget: text_display, group: "Measurements" }
+      - { id: measure_8, type: real, offset: 64, label: "Measure 8", widget: text_display, group: "Measurements" }
+      - { id: measure_9, type: real, offset: 68, label: "Measure 9", widget: text_display, group: "Measurements" }
+      - { id: measure_10, type: real, offset: 72, label: "Measure 10", widget: text_display, group: "Measurements" }
+      - { id: measure_11, type: real, offset: 76, label: "Measure 11", widget: text_display, group: "Measurements" }
+      - { id: measure_12, type: real, offset: 80, label: "Measure 12", widget: text_display, group: "Measurements" }
+      - { id: measure_13, type: real, offset: 84, label: "Measure 13", widget: text_display, group: "Measurements" }
+      - { id: measure_14, type: real, offset: 88, label: "Measure 14", widget: text_display, group: "Measurements" }
+      - { id: measure_15, type: real, offset: 92, label: "Measure 15", widget: text_display, group: "Measurements" }
+      - { id: measure_16, type: real, offset: 96, label: "Measure 16", widget: text_display, group: "Measurements" }
+      - { id: measure_17, type: real, offset: 100, label: "Measure 17", widget: text_display, group: "Measurements" }
+      - { id: measure_18, type: real, offset: 104, label: "Measure 18", widget: text_display, group: "Measurements" }
+      - { id: measure_19, type: real, offset: 108, label: "Measure 19", widget: text_display, group: "Measurements" }
+      - { id: measure_20, type: real, offset: 112, label: "Measure 20", widget: text_display, group: "Measurements" }
+
+devices:
+  - type: inspection_result
+    id: insp1
+    db: 4
+    offset: 0
+    label: "Inspection 1"
+  
+logging:
+  sinks:
+    - id: csv_main
+      type: csv
+      path: "logs/inspection_result.csv"
+    - id: sqlite_main
+      type: sqlite
+      path: "logs/inspection_result.db"
+      table: "inspection_result"
+  rules:
+    # All 4 instances go into the same sinks above -- one CSV file, one
+    # SQLite database, distinguished by the `device` column/tag on each row.
+    - devices: [insp1]
+      interval_ms: 100
+      sinks: [csv_main, sqlite_main]
