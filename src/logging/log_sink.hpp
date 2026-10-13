@@ -4,15 +4,14 @@
 #include <string>
 #include <vector>
 
+// One tag's value in a logged row.
 struct LogValue {
-    std::string tagId;
+    // The tag's display label (see tagDisplayLabel), not TagConfig::id.
+    // Sinks store it in their "tag_id" column/tag for schema compatibility.
+    std::string tagLabel;
     PlcValue value;
     bool stale;
-    std::string device; // optional; empty if the tag has none. Currently
-                         // only InfluxLogSink uses this, emitting it as a
-                         // real Influx tag — CSV/SQLite ignore it, so
-                         // adding it here never breaks their existing
-                         // {tagId, value, stale} aggregate-init call sites.
+    std::string device; // optional; empty if the tag has none (see TagConfig::device)
 };
 
 // Persists rows handed to it. Knows nothing about YAML, panels, or the PLC.

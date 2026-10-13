@@ -53,7 +53,7 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
-This produces two binaries under `build/`: `plc_gui` (the app) and `plc_gui_tests` (the test suite).
+This produces three binaries: `build/plc_gui` (the app), `build/fake_plc_server` (a stand-in PLC for local testing), and `build/tests/plc_gui_tests` (the test suite).
 
 ## Running
 

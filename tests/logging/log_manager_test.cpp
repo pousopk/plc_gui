@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include "logging/log_manager.hpp"
+#include "support/wait_until.hpp"
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -7,15 +8,6 @@
 #include <thread>
 
 namespace {
-
-bool waitUntil(const std::function<bool()>& predicate, int timeoutMs) {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-    while (std::chrono::steady_clock::now() < deadline) {
-        if (predicate()) return true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    return predicate();
-}
 
 class FakeLogSink : public ILogSink {
 public:
@@ -43,18 +35,18 @@ public:
     void close() override {}
 };
 
-std::shared_ptr<ValueMap> makeSnapshot() {
-    auto map = std::make_shared<ValueMap>();
-    (*map)["tag1"] = CachedValue{int32_t{42}, false, std::chrono::steady_clock::now()};
-    (*map)["tag2"] = CachedValue{true, true, std::chrono::steady_clock::now()};
-    return map;
+ValueMap makeValues() {
+    ValueMap values;
+    values["tag1"] = CachedValue{int32_t{42}, false, std::chrono::steady_clock::now()};
+    values["tag2"] = CachedValue{true, true, std::chrono::steady_clock::now()};
+    return values;
 }
 
 } // namespace
 
 TEST_CASE("LogManager opens sinks on start and closes them on stop") {
     ValueCache cache;
-    cache.publish(makeSnapshot());
+    cache.update(makeValues());
     auto sink = std::make_shared<FakeLogSink>();
 
     LogRuleConfig rule;
@@ -71,7 +63,7 @@ TEST_CASE("LogManager opens sinks on start and closes them on stop") {
 
 TEST_CASE("LogManager dispatches current cache values to configured sinks on schedule") {
     ValueCache cache;
-    cache.publish(makeSnapshot());
+    cache.update(makeValues());
     auto sink = std::make_shared<FakeLogSink>();
 
     LogRuleConfig rule;
@@ -87,16 +79,16 @@ TEST_CASE("LogManager dispatches current cache values to configured sinks on sch
 
     auto row = sink->rows.front();
     REQUIRE(row.size() == 2);
-    CHECK(row[0].tagId == "tag1");
+    CHECK(row[0].tagLabel == "tag1");
     CHECK(std::get<int32_t>(row[0].value) == 42);
     CHECK(row[0].stale == false);
-    CHECK(row[1].tagId == "tag2");
+    CHECK(row[1].tagLabel == "tag2");
     CHECK(row[1].stale == true);
 }
 
 TEST_CASE("LogManager dispatches under the tag's label when one is configured, falling back to id otherwise") {
     ValueCache cache;
-    cache.publish(makeSnapshot());
+    cache.update(makeValues());
     auto sink = std::make_shared<FakeLogSink>();
 
     LogRuleConfig rule;
@@ -104,9 +96,12 @@ TEST_CASE("LogManager dispatches under the tag's label when one is configured, f
     rule.intervalMs = 20;
     rule.sinks = {"s1"};
 
-    std::unordered_map<std::string, std::string> tagLabels = {{"tag1", "Finished"}};
+    TagConfig labeledTag;
+    labeledTag.id = "tag1";
+    labeledTag.label = "Finished";
+    // tag2 is deliberately absent from the tag list.
 
-    LogManager mgr({rule}, {{"s1", sink}}, cache, tagLabels);
+    LogManager mgr({rule}, {{"s1", sink}}, cache, {labeledTag});
     mgr.start();
 
     REQUIRE(waitUntil([&] { return sink->rowCount() >= 1; }, 500));
@@ -114,13 +109,13 @@ TEST_CASE("LogManager dispatches under the tag's label when one is configured, f
 
     auto row = sink->rows.front();
     REQUIRE(row.size() == 2);
-    CHECK(row[0].tagId == "Finished"); // tag1 has a label -> used instead of the raw id
-    CHECK(row[1].tagId == "tag2");     // tag2 has no label -> falls back to its raw id
+    CHECK(row[0].tagLabel == "Finished"); // tag1 has a label -> used instead of the raw id
+    CHECK(row[1].tagLabel == "tag2");     // tag2 is unknown -> falls back to its raw id
 }
 
 TEST_CASE("LogManager sets LogValue::device when configured, leaving it empty otherwise") {
     ValueCache cache;
-    cache.publish(makeSnapshot());
+    cache.update(makeValues());
     auto sink = std::make_shared<FakeLogSink>();
 
     LogRuleConfig rule;
@@ -128,10 +123,13 @@ TEST_CASE("LogManager sets LogValue::device when configured, leaving it empty ot
     rule.intervalMs = 20;
     rule.sinks = {"s1"};
 
-    std::unordered_map<std::string, std::string> tagLabels = {};
-    std::unordered_map<std::string, std::string> tagDevices = {{"tag1", "Camera 1"}};
+    TagConfig deviceTag;
+    deviceTag.id = "tag1";
+    deviceTag.device = "Camera 1";
+    TagConfig plainTag;
+    plainTag.id = "tag2";
 
-    LogManager mgr({rule}, {{"s1", sink}}, cache, tagLabels, tagDevices);
+    LogManager mgr({rule}, {{"s1", sink}}, cache, {deviceTag, plainTag});
     mgr.start();
 
     REQUIRE(waitUntil([&] { return sink->rowCount() >= 1; }, 500));
@@ -145,7 +143,7 @@ TEST_CASE("LogManager sets LogValue::device when configured, leaving it empty ot
 
 TEST_CASE("LogManager keeps running and keeps logging to other sinks after one sink throws") {
     ValueCache cache;
-    cache.publish(makeSnapshot());
+    cache.update(makeValues());
     auto badSink = std::make_shared<ThrowingLogSink>();
     auto goodSink = std::make_shared<FakeLogSink>();
 

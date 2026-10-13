@@ -6,7 +6,7 @@
 TrendHistoryQuery::TrendHistoryQuery(std::string dbPath, std::string table)
     : dbPath_(std::move(dbPath)), table_(std::move(table)) {}
 
-std::vector<TrendSample> TrendHistoryQuery::query(const std::string& tagId, const std::string& device, PlcType type,
+std::vector<TrendSample> TrendHistoryQuery::query(const std::string& tagLabel, const std::string& device, PlcType type,
                                                     std::chrono::system_clock::time_point from,
                                                     std::chrono::system_clock::time_point to) const {
     std::vector<TrendSample> result;
@@ -30,7 +30,7 @@ std::vector<TrendSample> TrendHistoryQuery::query(const std::string& tagId, cons
 
     std::string fromStr = formatTimestamp(from);
     std::string toStr = formatTimestamp(to);
-    sqlite3_bind_text(stmt, 1, tagId.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 1, tagLabel.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, device.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, fromStr.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 4, toStr.c_str(), -1, SQLITE_TRANSIENT);

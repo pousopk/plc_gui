@@ -24,12 +24,12 @@ TEST_CASE("PanelFactory builds widgets bound to the correct tag ids and params")
     panel.layout = "vertical";
 
     WidgetConfig slider;
-    slider.type = "slider";
+    slider.type = WidgetType::Slider;
     slider.tag = "speed";
     slider.params = {{"min", "0"}, {"max", "3000"}, {"label", "Speed"}};
 
     WidgetConfig toggle;
-    toggle.type = "toggle";
+    toggle.type = WidgetType::Toggle;
     toggle.tag = "running";
     toggle.params = {{"label", "Running"}};
 
@@ -59,11 +59,11 @@ TEST_CASE("A widget's caption defaults to the tag's label, but its own label par
     panel.title = "Outputs";
 
     WidgetConfig noOwnLabel;
-    noOwnLabel.type = "led_indicator";
+    noOwnLabel.type = WidgetType::LedIndicator;
     noOwnLabel.tag = "cam1_finished"; // no "label" param -> falls back to tag.label
 
     WidgetConfig ownLabel;
-    ownLabel.type = "led_indicator";
+    ownLabel.type = WidgetType::LedIndicator;
     ownLabel.tag = "cam1_ok";
     ownLabel.params = {{"label", "Custom Ok Caption"}}; // widget's own label wins
 
@@ -89,14 +89,14 @@ TEST_CASE("PanelFactory builds grouped widgets nested inside a single panel") {
     WidgetGroupConfig inputs;
     inputs.title = "Inputs";
     WidgetConfig toggle;
-    toggle.type = "toggle";
+    toggle.type = WidgetType::Toggle;
     toggle.tag = "cam1_in";
     inputs.widgets = {toggle};
 
     WidgetGroupConfig outputs;
     outputs.title = "Outputs";
     WidgetConfig led;
-    led.type = "led_indicator";
+    led.type = WidgetType::LedIndicator;
     led.tag = "cam1_finished";
     outputs.widgets = {led};
 
@@ -120,7 +120,7 @@ TEST_CASE("PanelFactory throws when a widget references a tag not in the tag lis
     PanelConfig panel;
     panel.title = "P";
     WidgetConfig w;
-    w.type = "toggle";
+    w.type = WidgetType::Toggle;
     w.tag = "missing";
     panel.widgets = {w};
 
@@ -133,7 +133,7 @@ TEST_CASE("PanelFactory names the widget and tag when a numeric param fails to p
     PanelConfig panel;
     panel.title = "P";
     WidgetConfig slider;
-    slider.type = "slider";
+    slider.type = WidgetType::Slider;
     slider.tag = "speed";
     slider.params = {{"min", "not_a_number"}, {"max", "100"}};
     panel.widgets = {slider};

@@ -1,30 +1,42 @@
 #pragma once
 #include "plc/plc_value.hpp"
 #include <chrono>
-#include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
 struct CachedValue {
     PlcValue value;
-    bool stale = false;
+    bool stale = false; // true when the last read failed or the PLC is disconnected
     std::chrono::steady_clock::time_point lastUpdate{};
 };
 
-using ValueMap = std::unordered_map<std::string, CachedValue>;
+using ValueMap = std::unordered_map<std::string, CachedValue>; // keyed by TagConfig::id
 
+// The latest known value of every polled tag. Written by PlcIoThread, read
+// by the UI and LogManager. Thread-safe: every method takes the same mutex,
+// and readers get their own copy, so they never see a half-applied update.
 class ValueCache {
 public:
-    ValueCache() : current_(std::make_shared<const ValueMap>()) {}
-
-    void publish(std::shared_ptr<const ValueMap> next) {
-        std::atomic_store(&current_, std::move(next));
+    // A copy of every tag's current value.
+    ValueMap snapshot() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return values_;
     }
 
-    std::shared_ptr<const ValueMap> snapshot() const {
-        return std::atomic_load(&current_);
+    // Sets the given tags' values; tags not in `changedValues` are untouched.
+    void update(const ValueMap& changedValues) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& [tagId, cached] : changedValues) values_[tagId] = cached;
+    }
+
+    // Flags every value as stale (e.g. after the PLC connection drops).
+    void markAllStale() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& [tagId, cached] : values_) cached.stale = true;
     }
 
 private:
-    std::shared_ptr<const ValueMap> current_;
+    mutable std::mutex mutex_;
+    ValueMap values_;
 };

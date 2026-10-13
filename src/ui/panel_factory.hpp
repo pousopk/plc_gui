@@ -7,12 +7,12 @@
 
 struct WidgetGroup {
     std::string title;
-    std::vector<std::unique_ptr<IWidget>> widgets;
+    std::vector<std::unique_ptr<Widget>> widgets;
 };
 
 struct Panel {
     std::string title;
-    std::vector<std::unique_ptr<IWidget>> widgets; // ungrouped
+    std::vector<std::unique_ptr<Widget>> widgets; // ungrouped
     std::vector<WidgetGroup> groups;                // labeled sub-sections
 };
 

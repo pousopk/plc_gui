@@ -209,7 +209,7 @@ logging:
     AppConfig cfg = ConfigLoader::load(path);
     REQUIRE(cfg.logging.sinks.size() == 1);
     const auto& s = cfg.logging.sinks[0];
-    CHECK(s.type == "influxdb");
+    CHECK(s.type == LogSinkType::InfluxDb);
     CHECK(s.url == "http://localhost:8086");
     CHECK(s.token == "my-token");
     CHECK(s.org == "my-org");
@@ -448,11 +448,11 @@ TEST_CASE("ConfigLoader generates one panel per device with fields grouped by th
     REQUIRE(cfg.panels[0].groups.size() == 2);
     CHECK(cfg.panels[0].groups[0].title == "Inputs");
     REQUIRE(cfg.panels[0].groups[0].widgets.size() == 2);
-    CHECK(cfg.panels[0].groups[0].widgets[0].type == "toggle");
+    CHECK(cfg.panels[0].groups[0].widgets[0].type == WidgetType::Toggle);
     CHECK(cfg.panels[0].groups[0].widgets[0].tag == "cam1_in");
     CHECK(cfg.panels[0].groups[1].title == "Outputs");
     REQUIRE(cfg.panels[0].groups[1].widgets.size() == 2);
-    CHECK(cfg.panels[0].groups[1].widgets[0].type == "led_indicator");
+    CHECK(cfg.panels[0].groups[1].widgets[0].type == WidgetType::LedIndicator);
     CHECK(cfg.panels[0].groups[1].widgets[0].tag == "cam1_finished");
 
     std::remove(path.c_str());

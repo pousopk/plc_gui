@@ -4,21 +4,19 @@
 #include <cstdio>
 #include <ctime>
 #include <string>
-#include <type_traits>
 
-inline std::string formatPlcValue(const PlcValue& v) {
-    return std::visit([](auto&& val) -> std::string {
-        using T = std::decay_t<decltype(val)>;
-        if constexpr (std::is_same_v<T, bool>) {
-            return val ? "true" : "false";
-        } else if constexpr (std::is_same_v<T, int32_t>) {
-            return std::to_string(val);
-        } else {
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "%g", val);
-            return std::string(buf);
-        }
-    }, v);
+// Text form used in CSV/SQLite: "true"/"false", a decimal integer, or a
+// float in %g format.
+inline std::string formatPlcValue(const PlcValue& value) {
+    if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value) ? "true" : "false";
+    }
+    if (std::holds_alternative<int32_t>(value)) {
+        return std::to_string(std::get<int32_t>(value));
+    }
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%g", std::get<float>(value));
+    return std::string(buf);
 }
 
 inline std::string formatTimestamp(std::chrono::system_clock::time_point tp) {

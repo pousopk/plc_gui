@@ -2,8 +2,8 @@
 #include <imgui.h>
 
 SliderWidget::SliderWidget(const WidgetConfig& cfg, const TagConfig& tag)
-    : WidgetBase(tag.id),
-      label_(getParam(cfg, "label", defaultLabel(tag))),
+    : Widget(tag.id),
+      label_(getParam(cfg, "label", tagDisplayLabel(tag))),
       minVal_(std::stof(getParam(cfg, "min", "0"))),
       maxVal_(std::stof(getParam(cfg, "max", "100"))) {}
 

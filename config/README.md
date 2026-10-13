@@ -15,23 +15,25 @@ flowchart LR
 
 ## 1. The `plc:` block — how to connect
 
-Every config starts here. This is the only block yaml-cpp will refuse to
-load without:
+Every config starts here. `plc:` and `logging:` (step 4, may be empty:
+`logging: {}`) are the only top-level blocks the loader requires.
 
 ```yaml
 plc:
   ip: "192.168.0.10"     # required
-  rack: 0                # required — S7 rack number (0 for S7-1200/1500)
-  slot: 1                # required — S7 slot number (1 for S7-1200/1500)
+  rack: 0                # S7 rack number (0 for S7-1200/1500)
+  slot: 1                # S7 slot number (1 for S7-1200/1500)
 ```
 
 Optional fields, with their defaults:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `name` | — | Cosmetic label, shown in the UI |
-| `connect_timeout_ms` | 2000 | How long to wait for the initial connection |
-| `reconnect_backoff_ms` | — | List of delays tried in order after a dropped connection, e.g. `[500, 1000, 2000, 5000]` (holds at the last value) |
+| `name` | `"PLC"` | Cosmetic label, shown as the main window title |
+| `rack` | 0 | S7 rack number |
+| `slot` | 1 | S7 slot number |
+| `connect_timeout_ms` | 2000 | Parsed but **not currently applied** — Snap7's own default connect timeout is used |
+| `reconnect_backoff_ms` | `[500, 1000, 2000, 5000]` | Delays tried in order after a dropped connection (holds at the last value) |
 
 ## 2. `tags:` — what to read or write
 
@@ -88,14 +90,20 @@ Every widget needs `type` and `tag` (must reference a tag defined above —
 `--validate-config` catches dangling references). `label` is optional on
 every widget and defaults to the tag's own `label`.
 
-| `type` | Direction | Extra params | Use for |
-|---|---|---|---|
-| `slider` | writable | `min` (default `"0"`), `max` (default `"100"`) | Numeric setpoints |
-| `input_number` | writable | — | Typed numeric entry |
-| `toggle` | writable | — | Booleans held on/off |
-| `button` | writable | — | Momentary pulses (write-once-per-click) |
-| `text_display` | read-only | `format` (default `"%.2f"`, printf-style) | Read-only numeric readout |
-| `led_indicator` | read-only | — | Read-only boolean status |
+| `type` | Direction | Tag `type` | Extra params | Use for |
+|---|---|---|---|---|
+| `slider` | writable | `real` only | `min` (default `"0"`), `max` (default `"100"`) | Numeric setpoints |
+| `input_number` | writable | any numeric | — | Typed numeric entry |
+| `toggle` | writable | `bool` only | — | Booleans held on/off |
+| `button` | writable | `bool` only | — | Writes `true` on each click; the PLC program must reset the bit |
+| `text_display` | read-only | any | `format` (default `"%.2f"`) | Read-only numeric readout |
+| `led_indicator` | read-only | `bool` | — | Read-only boolean status |
+
+⚠️ The "Tag `type`" column is **not checked by `--validate-config`**. A
+writable widget bound to the wrong tag type (e.g. a `slider` on an `int`
+tag) crashes the app on the first write. `format` must contain exactly one
+float conversion (e.g. `"%.1f bar"`), since every value is printed as a
+double.
 
 Related widgets can share a titled sub-group inside one panel:
 

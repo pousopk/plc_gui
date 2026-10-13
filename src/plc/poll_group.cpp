@@ -5,7 +5,7 @@
 
 std::vector<PollGroup> buildPollGroups(const std::vector<TagConfig>& tags) {
     std::map<int, std::vector<TagConfig>> byInterval;
-    for (const auto& t : tags) byInterval[t.updateIntervalMs].push_back(t);
+    for (const auto& tag : tags) byInterval[tag.updateIntervalMs].push_back(tag);
 
     std::vector<PollGroup> groups;
     for (auto& [interval, groupTags] : byInterval) {

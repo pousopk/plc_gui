@@ -28,9 +28,8 @@ struct TrendTagInfo {
     PlcType type;
 };
 
-// One entry per configured tag, in config order. label falls back to the
-// tag's id when it has no explicit label (mirrors defaultLabel in
-// ui/widgets/iwidget.hpp, and matches LogManager's own displayName rule).
+// One entry per configured tag, in config order. `label` is
+// tagDisplayLabel(tag) -- the same name LogManager stores rows under.
 std::vector<TrendTagInfo> buildTrendTagList(const std::vector<TagConfig>& tags);
 
 struct TrendDeviceGroup {
@@ -58,9 +57,9 @@ std::unordered_map<std::string, std::vector<TrendSample>> refreshTrendHistoryCac
 // selector, an Overlay/Stacked layout toggle, and an ImPlot chart of every
 // checked tag's series -- either overlaid on one plot, or stacked one plot
 // per tag with linked time axes (numeric tags as a line, PlcType::Bool tags
-// as a step plot). Historical
-// range buttons are disabled when historyQuery is nullptr (no sqlite sink
-// configured) -- Live mode (reading trendBuffer) always works.
+// as a step plot). Historical range buttons are disabled when historyQuery
+// is nullptr (no sqlite sink configured) -- Live mode (reading trendBuffer)
+// always works.
 class TrendsScreen {
 public:
     TrendsScreen(std::vector<TagConfig> tags, TrendBuffer& trendBuffer, TrendHistoryQuery* historyQuery);
@@ -68,9 +67,16 @@ public:
     void render();
 
 private:
+    void renderTagChecklist();
+    void renderModeSelector();
+    void renderChart();
+
     void refreshHistoryCacheIfNeeded();
-    // Plots t's live or cached-historical series into the current ImPlot plot.
-    void plotTag(const TrendTagInfo& t);
+    // t's samples for the current mode: the live buffer, or the cached
+    // historical query result.
+    std::vector<TrendSample> samplesFor(const TrendTagInfo& tag) const;
+    // Plots t's samples into the current ImPlot plot.
+    void plotTag(const TrendTagInfo& tag);
 
     std::vector<TrendTagInfo> tagList_;
     TrendBuffer& trendBuffer_;

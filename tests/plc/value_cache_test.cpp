@@ -5,24 +5,33 @@
 
 TEST_CASE("ValueCache starts with an empty snapshot") {
     ValueCache cache;
-    auto snap = cache.snapshot();
-    REQUIRE(snap != nullptr);
-    CHECK(snap->empty());
+    CHECK(cache.snapshot().empty());
 }
 
-TEST_CASE("ValueCache publish replaces the snapshot readers see") {
+TEST_CASE("ValueCache update sets values readers see, leaving other tags untouched") {
     ValueCache cache;
-    auto next = std::make_shared<ValueMap>();
-    (*next)["tag1"] = CachedValue{int32_t{42}, false, std::chrono::steady_clock::now()};
-    cache.publish(next);
+    cache.update({{"tag1", CachedValue{int32_t{42}, false, std::chrono::steady_clock::now()}}});
+    cache.update({{"tag2", CachedValue{true, false, std::chrono::steady_clock::now()}}});
 
-    auto snap = cache.snapshot();
-    REQUIRE(snap->count("tag1") == 1);
-    CHECK(std::get<int32_t>(snap->at("tag1").value) == 42);
-    CHECK(snap->at("tag1").stale == false);
+    ValueMap snapshot = cache.snapshot();
+    REQUIRE(snapshot.count("tag1") == 1);
+    REQUIRE(snapshot.count("tag2") == 1);
+    CHECK(std::get<int32_t>(snapshot.at("tag1").value) == 42);
+    CHECK(snapshot.at("tag1").stale == false);
 }
 
-TEST_CASE("ValueCache concurrent publish/snapshot never yields a torn map") {
+TEST_CASE("ValueCache markAllStale flags every value as stale") {
+    ValueCache cache;
+    cache.update({{"tag1", CachedValue{int32_t{1}, false, std::chrono::steady_clock::now()}},
+                  {"tag2", CachedValue{int32_t{2}, false, std::chrono::steady_clock::now()}}});
+    cache.markAllStale();
+
+    ValueMap snapshot = cache.snapshot();
+    CHECK(snapshot.at("tag1").stale);
+    CHECK(snapshot.at("tag2").stale);
+}
+
+TEST_CASE("ValueCache concurrent update/snapshot never yields a torn map") {
     ValueCache cache;
     constexpr int kIterations = 2000;
     std::atomic<bool> stop{false};
@@ -30,22 +39,22 @@ TEST_CASE("ValueCache concurrent publish/snapshot never yields a torn map") {
 
     std::thread writer([&] {
         for (int i = 0; i < kIterations; ++i) {
-            auto next = std::make_shared<ValueMap>();
+            ValueMap values;
             for (const char* id : {"a", "b", "c"}) {
-                (*next)[id] = CachedValue{int32_t{i}, false, std::chrono::steady_clock::now()};
+                values[id] = CachedValue{int32_t{i}, false, std::chrono::steady_clock::now()};
             }
-            cache.publish(next);
+            cache.update(values);
         }
         stop = true;
     });
 
     auto reader = [&] {
         while (!stop.load()) {
-            auto snap = cache.snapshot();
-            if (snap->size() == 3) {
-                int a = std::get<int32_t>(snap->at("a").value);
-                int b = std::get<int32_t>(snap->at("b").value);
-                int c = std::get<int32_t>(snap->at("c").value);
+            ValueMap snapshot = cache.snapshot();
+            if (snapshot.size() == 3) {
+                int a = std::get<int32_t>(snapshot.at("a").value);
+                int b = std::get<int32_t>(snapshot.at("b").value);
+                int c = std::get<int32_t>(snapshot.at("c").value);
                 if (a != b || b != c) failed = true;
             }
         }

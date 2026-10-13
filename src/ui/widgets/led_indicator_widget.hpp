@@ -1,7 +1,7 @@
 #pragma once
 #include "ui/widgets/iwidget.hpp"
 
-class LedIndicatorWidget : public WidgetBase {
+class LedIndicatorWidget : public Widget {
 public:
     LedIndicatorWidget(const WidgetConfig& cfg, const TagConfig& tag);
     void render(const ValueMap& snapshot, PlcIoThread& io) override;

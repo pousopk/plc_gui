@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 InputNumberWidget::InputNumberWidget(const WidgetConfig& cfg, const TagConfig& tag)
-    : WidgetBase(tag.id), label_(getParam(cfg, "label", defaultLabel(tag))), type_(tag.type) {}
+    : Widget(tag.id), label_(getParam(cfg, "label", tagDisplayLabel(tag))), type_(tag.type) {}
 
 void InputNumberWidget::render(const ValueMap& snapshot, PlcIoThread& io) {
     auto it = snapshot.find(tagId_);

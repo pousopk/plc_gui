@@ -9,21 +9,18 @@
 #include <unordered_map>
 #include <vector>
 
-// Owns its own thread; depends only on ValueCache and ILogSink, never on
-// the UI. This is what lets it run identically in GUI and headless mode.
+// Runs each logging rule on its own interval: reads the rule's tags from
+// ValueCache and writes them to the rule's sinks. Owns its own thread and
+// depends only on ValueCache and ILogSink, never on the UI, so it runs
+// identically in GUI and headless mode.
 class LogManager {
 public:
-    // tagLabels maps tag id -> display name, for tags whose config gave
-    // them a `label` (an id absent from this map just logs under its own
-    // id). tagDevices maps tag id -> device name, for tags whose config
-    // gave them a `device` (passed through to LogValue::device, currently
-    // only consumed by InfluxLogSink). Both default to empty so existing
-    // call sites need no changes.
+    // `tags` supplies each logged tag's label and device. A rule tag that
+    // isn't in `tags` is logged under its raw id with an empty device.
     LogManager(std::vector<LogRuleConfig> rules,
                std::unordered_map<std::string, std::shared_ptr<ILogSink>> sinksById,
                const ValueCache& cache,
-               std::unordered_map<std::string, std::string> tagLabels = {},
-               std::unordered_map<std::string, std::string> tagDevices = {});
+               const std::vector<TagConfig>& tags = {});
     ~LogManager();
     LogManager(const LogManager&) = delete;
     LogManager& operator=(const LogManager&) = delete;
@@ -32,16 +29,22 @@ public:
     void stop();
 
 private:
+    static constexpr int kLoopSleepMs = 10;
+
+    // A rule plus the next time it should run.
+    struct ScheduledRule {
+        LogRuleConfig rule;
+        std::chrono::steady_clock::time_point nextDue;
+    };
+
     void run();
     void runRule(const LogRuleConfig& rule);
 
-    std::vector<LogRuleConfig> rules_;
+    std::vector<ScheduledRule> scheduledRules_;
     std::unordered_map<std::string, std::shared_ptr<ILogSink>> sinksById_;
     const ValueCache& cache_;
-    std::unordered_map<std::string, std::string> tagLabels_;
-    std::unordered_map<std::string, std::string> tagDevices_;
+    std::unordered_map<std::string, TagConfig> tagsById_;
 
-    std::vector<std::chrono::steady_clock::time_point> nextDue_;
     std::thread thread_;
     std::atomic<bool> running_{false};
 };

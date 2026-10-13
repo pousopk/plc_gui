@@ -1,7 +1,6 @@
 #pragma once
 #include "plc/plc_value.hpp"
 #include <map>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -21,21 +20,57 @@ struct TagConfig {
     int offset = 0;
     int bit = 0; // only meaningful for PlcType::Bool
     int updateIntervalMs = 1000;
-    std::string label; // optional human-friendly name; empty means "use id".
-                        // Used as the tag_id sent to every logging sink
-                        // (CSV/SQLite/InfluxDB) and as the default widget
-                        // caption, so a display name only has to be typed
-                        // once per tag rather than once per widget/sink.
-    std::string device; // optional; identifies which physical device this
-                         // tag belongs to (e.g. "Camera 1"). InfluxLogSink
-                         // emits it as a real Influx tag, so two devices
-                         // sharing a label (e.g. two cameras both having a
-                         // "Finished" signal) land in separate time series
-                         // instead of colliding into one.
+    // Optional human-friendly name; empty means "use id" (see
+    // tagDisplayLabel below).
+    std::string label;
+    // Optional; the physical device this tag belongs to (e.g. "Camera 1").
+    // Written to every logging sink next to the label, so two devices that
+    // share a label (e.g. two cameras both having a "Finished" signal) stay
+    // in separate series instead of colliding into one.
+    std::string device;
 };
 
+// The display name for a tag: its `label` if one is configured, otherwise
+// its raw id. This single rule is used for widget captions, trend chart
+// names, and the tag_id column written to every logging sink.
+inline std::string tagDisplayLabel(const TagConfig& tag) {
+    return tag.label.empty() ? tag.id : tag.label;
+}
+
+// YAML names: "slider", "input_number", "toggle", "button",
+// "text_display", "led_indicator" (see ConfigLoader::parseWidgetType).
+enum class WidgetType { Slider, InputNumber, Toggle, Button, TextDisplay, LedIndicator };
+
+// The YAML name of a widget type, used in error messages.
+inline const char* widgetTypeName(WidgetType type) {
+    switch (type) {
+        case WidgetType::Slider:       return "slider";
+        case WidgetType::InputNumber:  return "input_number";
+        case WidgetType::Toggle:       return "toggle";
+        case WidgetType::Button:       return "button";
+        case WidgetType::TextDisplay:  return "text_display";
+        case WidgetType::LedIndicator: return "led_indicator";
+    }
+    return "unknown";
+}
+
+// Writable widgets send values to the PLC; the others only display them.
+inline bool isWritableWidget(WidgetType type) {
+    switch (type) {
+        case WidgetType::Slider:
+        case WidgetType::InputNumber:
+        case WidgetType::Toggle:
+        case WidgetType::Button:
+            return true;
+        case WidgetType::TextDisplay:
+        case WidgetType::LedIndicator:
+            return false;
+    }
+    return false;
+}
+
 struct WidgetConfig {
-    std::string type;   // "slider" | "input_number" | "toggle" | "button" | "text_display" | "led_indicator"
+    WidgetType type = WidgetType::TextDisplay;
     std::string tag;    // TagConfig::id
     std::map<std::string, std::string> params; // label, min, max, format, ... (widget-specific)
 };
@@ -55,9 +90,12 @@ struct PanelConfig {
     std::vector<WidgetGroupConfig> groups;  // optional labeled sub-sections
 };
 
+// YAML names: "csv", "sqlite", "influxdb".
+enum class LogSinkType { Csv, Sqlite, InfluxDb };
+
 struct LogSinkConfig {
     std::string id;
-    std::string type; // "csv" | "sqlite" | "influxdb"
+    LogSinkType type = LogSinkType::Csv;
     std::string path;  // csv, sqlite
     std::string table; // sqlite only
     std::string url;         // influxdb only, e.g. "http://localhost:8086"

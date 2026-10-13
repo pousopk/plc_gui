@@ -34,11 +34,10 @@ void handleSignal(int) { g_stop = true; }
 // Ids of every tag some writable widget points at, across both a panel's
 // flat widgets and its groups (device_types expansion produces groups).
 std::set<std::string> collectWritableTagIds(const std::vector<PanelConfig>& panels) {
-    static const std::set<std::string> kWritableWidgetTypes = {"slider", "input_number", "toggle", "button"};
     std::set<std::string> ids;
     auto scan = [&](const std::vector<WidgetConfig>& widgets) {
-        for (const auto& w : widgets) {
-            if (kWritableWidgetTypes.count(w.type)) ids.insert(w.tag);
+        for (const auto& widget : widgets) {
+            if (isWritableWidget(widget.type)) ids.insert(widget.tag);
         }
     };
     for (const auto& panel : panels) {

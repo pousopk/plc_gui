@@ -45,7 +45,7 @@ void SqliteLogSink::writeRow(std::chrono::system_clock::time_point ts, const std
     for (const auto& v : values) {
         sqlite3_reset(insertStmt_);
         sqlite3_bind_text(insertStmt_, 1, tsStr.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(insertStmt_, 2, v.tagId.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(insertStmt_, 2, v.tagLabel.c_str(), -1, SQLITE_TRANSIENT);
         std::string valStr = formatPlcValue(v.value);
         sqlite3_bind_text(insertStmt_, 3, valStr.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_int(insertStmt_, 4, v.stale ? 1 : 0);

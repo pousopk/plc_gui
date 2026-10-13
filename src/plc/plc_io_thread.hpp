@@ -31,17 +31,26 @@ public:
     ConnectionState connectionState() const;
 
 private:
+    static constexpr int kLoopSleepMs = 10;
+    static constexpr int kFallbackReconnectDelayMs = 1000; // used if reconnect_backoff_ms is empty
+
+    // A poll group plus the next time it should be read.
+    struct ScheduledPollGroup {
+        PollGroup group;
+        std::chrono::steady_clock::time_point nextDue;
+    };
+
     void run();
     bool tryConnect();
+    int nextReconnectDelayMs();
+    void handleConnectionLost();
     void pollGroup(const PollGroup& group);
     void drainWriteQueue();
-    void markAllStale();
 
     PlcConnectionConfig plcConfig_;
     std::vector<TagConfig> tags_;
     std::unordered_map<std::string, TagConfig> tagsById_;
-    std::vector<PollGroup> pollGroups_;
-    std::vector<std::chrono::steady_clock::time_point> nextDue_;
+    std::vector<ScheduledPollGroup> scheduledGroups_;
     ValueCache& cache_;
     TrendBuffer* trendBuffer_ = nullptr;
 

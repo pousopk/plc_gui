@@ -1,7 +1,7 @@
 #pragma once
 #include "ui/widgets/iwidget.hpp"
 
-class TextDisplayWidget : public WidgetBase {
+class TextDisplayWidget : public Widget {
 public:
     TextDisplayWidget(const WidgetConfig& cfg, const TagConfig& tag);
     void render(const ValueMap& snapshot, PlcIoThread& io) override;

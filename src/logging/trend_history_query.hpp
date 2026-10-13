@@ -9,10 +9,9 @@
 // its own connection (separate from the sink's write connection) so a slow
 // historical query never blocks logging writes.
 //
-// IMPORTANT: `tagId` here must be each tag's SQLite-stored key — the
-// display name LogManager writes rows under (label if set, else id; see
-// log_manager.cpp runRule) — NOT necessarily TagConfig::id. See
-// ui/trends_screen.hpp for where that distinction is resolved.
+// IMPORTANT: `tagLabel` is the name LogManager stores each row under, i.e.
+// tagDisplayLabel(tag) -- NOT TagConfig::id. It is matched against the
+// table's tag_id column.
 //
 // `device` must also be supplied (TagConfig::device, empty string if the
 // tag has none) and is matched exactly against the row's device column.
@@ -23,7 +22,7 @@ class TrendHistoryQuery {
 public:
     TrendHistoryQuery(std::string dbPath, std::string table);
 
-    std::vector<TrendSample> query(const std::string& tagId, const std::string& device, PlcType type,
+    std::vector<TrendSample> query(const std::string& tagLabel, const std::string& device, PlcType type,
                                     std::chrono::system_clock::time_point from,
                                     std::chrono::system_clock::time_point to) const;
 

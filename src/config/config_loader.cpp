@@ -2,97 +2,161 @@
 #include <yaml-cpp/yaml.h>
 #include <map>
 #include <set>
-#include <sstream>
 #include <unordered_map>
+
+// Every parse/validate function below takes a `path` argument: the location
+// of the YAML node being read (e.g. "panels[0].widgets[2]"). It is only used
+// to make error messages point at the exact config line that is wrong.
 
 namespace {
 
-const std::set<std::string> kKnownWidgetTypes = {
-    "slider", "input_number", "toggle", "button", "text_display", "led_indicator"
-};
-const std::set<std::string> kKnownSinkTypes = {"csv", "sqlite", "influxdb"};
+// Widget keys that WidgetConfig stores in dedicated fields; every other key
+// on a widget entry goes into WidgetConfig::params.
 const std::set<std::string> kReservedWidgetKeys = {"type", "tag"};
-const std::set<std::string> kWritableWidgetTypes = {"toggle", "button", "input_number", "slider"};
-const std::set<std::string> kReadOnlyWidgetTypes = {"led_indicator", "text_display"};
 
-[[noreturn]] void fail(const std::string& context, const std::string& reason) {
-    std::ostringstream oss;
-    oss << context << ": " << reason;
-    throw ConfigError(oss.str());
+[[noreturn]] void fail(const std::string& path, const std::string& reason) {
+    throw ConfigError(path + ": " + reason);
 }
 
-YAML::Node requireNode(const YAML::Node& parent, const std::string& key, const std::string& context) {
+// Path of the element at `index` in the list at `listPath`, e.g.
+// atIndex("tags", 3) == "tags[3]".
+std::string atIndex(const std::string& listPath, size_t index) {
+    return listPath + "[" + std::to_string(index) + "]";
+}
+
+YAML::Node requireNode(const YAML::Node& parent, const std::string& key, const std::string& parentPath) {
     YAML::Node node = parent[key];
-    if (!node) fail(context + "." + key, "missing required field");
+    if (!node) fail(parentPath + "." + key, "missing required field");
     return node;
 }
 
-PlcType parsePlcType(const std::string& s, const std::string& context) {
-    if (s == "bool") return PlcType::Bool;
-    if (s == "int") return PlcType::Int;
-    if (s == "uint") return PlcType::UInt;
-    if (s == "usint") return PlcType::USInt;
-    if (s == "real") return PlcType::Real;
-    if (s == "time") return PlcType::Time;
-    fail(context, "unknown type '" + s + "' (expected bool|int|uint|usint|real|time)");
+// Returns parent[key] converted to T, or `fallback` when the key is absent.
+template <typename T>
+T readOptional(const YAML::Node& parent, const std::string& key, const T& fallback) {
+    YAML::Node node = parent[key];
+    if (!node) return fallback;
+    return node.as<T>();
+}
+
+PlcType parsePlcType(const std::string& name, const std::string& path) {
+    if (name == "bool") return PlcType::Bool;
+    if (name == "int") return PlcType::Int;
+    if (name == "uint") return PlcType::UInt;
+    if (name == "usint") return PlcType::USInt;
+    if (name == "real") return PlcType::Real;
+    if (name == "time") return PlcType::Time;
+    fail(path, "unknown type '" + name + "' (expected bool|int|uint|usint|real|time)");
+}
+
+WidgetType parseWidgetType(const std::string& name, const std::string& path) {
+    if (name == "slider") return WidgetType::Slider;
+    if (name == "input_number") return WidgetType::InputNumber;
+    if (name == "toggle") return WidgetType::Toggle;
+    if (name == "button") return WidgetType::Button;
+    if (name == "text_display") return WidgetType::TextDisplay;
+    if (name == "led_indicator") return WidgetType::LedIndicator;
+    fail(path, "unknown widget type '" + name + "'");
+}
+
+LogSinkType parseLogSinkType(const std::string& name, const std::string& path) {
+    if (name == "csv") return LogSinkType::Csv;
+    if (name == "sqlite") return LogSinkType::Sqlite;
+    if (name == "influxdb") return LogSinkType::InfluxDb;
+    fail(path, "unknown sink type '" + name + "'");
 }
 
 PlcConnectionConfig parsePlc(const YAML::Node& root) {
     YAML::Node node = requireNode(root, "plc", "root");
-    PlcConnectionConfig cfg;
-    cfg.name = node["name"] ? node["name"].as<std::string>() : cfg.name;
-    cfg.ip = requireNode(node, "ip", "plc").as<std::string>();
-    cfg.rack = node["rack"] ? node["rack"].as<int>() : cfg.rack;
-    cfg.slot = node["slot"] ? node["slot"].as<int>() : cfg.slot;
-    cfg.connectTimeoutMs = node["connect_timeout_ms"] ? node["connect_timeout_ms"].as<int>() : cfg.connectTimeoutMs;
-    if (node["reconnect_backoff_ms"]) {
-        cfg.reconnectBackoffMs = node["reconnect_backoff_ms"].as<std::vector<int>>();
-    }
-    return cfg;
+    PlcConnectionConfig plc;
+    plc.name = readOptional(node, "name", plc.name);
+    plc.ip = requireNode(node, "ip", "plc").as<std::string>();
+    plc.rack = readOptional(node, "rack", plc.rack);
+    plc.slot = readOptional(node, "slot", plc.slot);
+    plc.connectTimeoutMs = readOptional(node, "connect_timeout_ms", plc.connectTimeoutMs);
+    plc.reconnectBackoffMs = readOptional(node, "reconnect_backoff_ms", plc.reconnectBackoffMs);
+    return plc;
 }
 
 std::vector<TagConfig> parseTags(const YAML::Node& root) {
     std::vector<TagConfig> tags;
-    YAML::Node node = root["tags"];
-    if (!node) return tags;
-    for (const auto& item : node) {
-        std::string ctx = "tags[" + std::to_string(tags.size()) + "]";
-        TagConfig t;
-        t.id = requireNode(item, "id", ctx).as<std::string>();
-        t.db = requireNode(item, "db", ctx).as<int>();
-        t.type = parsePlcType(requireNode(item, "type", ctx).as<std::string>(), ctx + ".type");
-        t.offset = requireNode(item, "offset", ctx).as<int>();
-        t.bit = item["bit"] ? item["bit"].as<int>() : 0;
-        t.updateIntervalMs = requireNode(item, "update_interval_ms", ctx).as<int>();
-        t.label = item["label"] ? item["label"].as<std::string>() : std::string();
-        t.device = item["device"] ? item["device"].as<std::string>() : std::string();
-        tags.push_back(std::move(t));
+    YAML::Node tagsNode = root["tags"];
+    if (!tagsNode) return tags;
+
+    for (const auto& tagNode : tagsNode) {
+        std::string path = atIndex("tags", tags.size());
+        TagConfig tag;
+        tag.id = requireNode(tagNode, "id", path).as<std::string>();
+        tag.db = requireNode(tagNode, "db", path).as<int>();
+        tag.type = parsePlcType(requireNode(tagNode, "type", path).as<std::string>(), path + ".type");
+        tag.offset = requireNode(tagNode, "offset", path).as<int>();
+        tag.bit = readOptional(tagNode, "bit", 0);
+        tag.updateIntervalMs = requireNode(tagNode, "update_interval_ms", path).as<int>();
+        tag.label = readOptional(tagNode, "label", std::string());
+        tag.device = readOptional(tagNode, "device", std::string());
+        tags.push_back(std::move(tag));
     }
     return tags;
 }
 
-WidgetConfig parseWidget(const YAML::Node& item, const std::string& ctx) {
-    WidgetConfig w;
-    w.type = requireNode(item, "type", ctx).as<std::string>();
-    if (!kKnownWidgetTypes.count(w.type)) fail(ctx + ".type", "unknown widget type '" + w.type + "'");
-    w.tag = requireNode(item, "tag", ctx).as<std::string>();
-    for (const auto& kv : item) {
-        std::string key = kv.first.as<std::string>();
+WidgetConfig parseWidget(const YAML::Node& widgetNode, const std::string& path) {
+    WidgetConfig widget;
+    widget.type = parseWidgetType(requireNode(widgetNode, "type", path).as<std::string>(), path + ".type");
+    widget.tag = requireNode(widgetNode, "tag", path).as<std::string>();
+    for (const auto& keyValue : widgetNode) {
+        std::string key = keyValue.first.as<std::string>();
         if (kReservedWidgetKeys.count(key)) continue;
-        w.params[key] = kv.second.as<std::string>();
+        widget.params[key] = keyValue.second.as<std::string>();
     }
-    return w;
+    return widget;
 }
 
-// --- device_types: / devices: — reusable "device blueprint" expansion ---
+std::vector<WidgetConfig> parseWidgetList(const YAML::Node& listNode, const std::string& listPath) {
+    std::vector<WidgetConfig> widgets;
+    if (!listNode) return widgets;
+    for (const auto& widgetNode : listNode) {
+        widgets.push_back(parseWidget(widgetNode, atIndex(listPath, widgets.size())));
+    }
+    return widgets;
+}
+
+std::vector<PanelConfig> parsePanels(const YAML::Node& root) {
+    std::vector<PanelConfig> panels;
+    YAML::Node panelsNode = root["panels"];
+    if (!panelsNode) return panels;
+
+    for (const auto& panelNode : panelsNode) {
+        std::string path = atIndex("panels", panels.size());
+        PanelConfig panel;
+        panel.title = requireNode(panelNode, "title", path).as<std::string>();
+        panel.layout = readOptional(panelNode, "layout", std::string("vertical"));
+        if (panel.layout != "vertical") {
+            fail(path + ".layout", "unsupported layout '" + panel.layout + "' (only 'vertical' is implemented)");
+        }
+        panel.widgets = parseWidgetList(panelNode["widgets"], path + ".widgets");
+
+        if (panelNode["groups"]) {
+            for (const auto& groupNode : panelNode["groups"]) {
+                std::string groupPath = atIndex(path + ".groups", panel.groups.size());
+                WidgetGroupConfig group;
+                group.title = requireNode(groupNode, "title", groupPath).as<std::string>();
+                group.widgets = parseWidgetList(groupNode["widgets"], groupPath + ".widgets");
+                panel.groups.push_back(std::move(group));
+            }
+        }
+        panels.push_back(std::move(panel));
+    }
+    return panels;
+}
+
+// --- device_types: / devices: -- reusable "device blueprint" expansion ---
 //
 // A device_types entry describes one repeatable physical device's fields
 // once (offset/bit/type/label/widget/group). Each devices entry
 // instantiates it with just an id prefix, DB number, and display name.
-// Expansion below turns this into exactly the same TagConfig/PanelConfig/
-// LogRuleConfig::tags shapes that direct tags:/panels:/rules[].tags
-// already produce — so nothing downstream (PlcIoThread, PanelFactory,
-// LogManager, widgets) needs any awareness this shorthand exists.
+// expandDevices() turns this into exactly the same TagConfig/PanelConfig
+// shapes that direct tags:/panels: produce, and parseLogging() expands a
+// rule's `devices:` into tag ids -- so nothing downstream (PlcIoThread,
+// PanelFactory, LogManager, widgets) needs to know this shorthand exists.
 
 struct DeviceFieldBlueprint {
     std::string id;
@@ -101,7 +165,7 @@ struct DeviceFieldBlueprint {
     int bit;
     std::string label;
     bool writable;
-    std::string widget;
+    WidgetType widget;
     std::string group;
 };
 
@@ -114,97 +178,115 @@ struct DeviceInstance {
     std::string type;
     std::string id;
     int db;
-    int offset = 0; // added to every field's blueprint offset; lets several
-                     // instances of the same device_type share one DB at
-                     // different byte offsets, instead of one DB each
+    // Added to every field's blueprint offset; lets several instances of the
+    // same device_type share one DB at different byte offsets.
+    int offset = 0;
     std::string label;
 };
 
-std::map<std::string, DeviceTypeBlueprint> parseDeviceTypes(const YAML::Node& root) {
-    std::map<std::string, DeviceTypeBlueprint> types;
-    YAML::Node node = root["device_types"];
-    if (!node) return types;
+// The tags and panels generated from the devices: section.
+struct ExpandedDevices {
+    std::vector<TagConfig> tags;
+    std::vector<PanelConfig> panels;
+};
 
-    for (const auto& kv : node) {
-        std::string typeName = kv.first.as<std::string>();
-        std::string ctx = "device_types." + typeName;
-        DeviceTypeBlueprint blueprint;
-        blueprint.updateIntervalMs = requireNode(kv.second, "update_interval_ms", ctx).as<int>();
+// The id of the tag generated for one field of one device instance.
+std::string deviceTagId(const std::string& deviceId, const std::string& fieldId) {
+    return deviceId + "_" + fieldId;
+}
 
-        YAML::Node fieldsNode = requireNode(kv.second, "fields", ctx);
-        int fi = 0;
-        for (const auto& f : fieldsNode) {
-            std::string fctx = ctx + ".fields[" + std::to_string(fi++) + "]";
-            DeviceFieldBlueprint field;
-            field.id = requireNode(f, "id", fctx).as<std::string>();
-            field.type = parsePlcType(requireNode(f, "type", fctx).as<std::string>(), fctx + ".type");
-            field.offset = requireNode(f, "offset", fctx).as<int>();
-            field.bit = f["bit"] ? f["bit"].as<int>() : 0;
-            field.label = f["label"] ? f["label"].as<std::string>() : field.id;
-            field.writable = f["writable"] ? f["writable"].as<bool>() : false;
-            field.widget = requireNode(f, "widget", fctx).as<std::string>();
-            if (!kKnownWidgetTypes.count(field.widget)) {
-                fail(fctx + ".widget", "unknown widget type '" + field.widget + "'");
-            }
-            bool widgetIsWritable = kWritableWidgetTypes.count(field.widget) > 0;
-            if (field.writable && !widgetIsWritable) {
-                fail(fctx, "writable: true but widget '" + field.widget +
-                               "' is read-only (use toggle/button/input_number/slider)");
-            }
-            if (!field.writable && widgetIsWritable) {
-                fail(fctx, "widget '" + field.widget +
-                               "' is writable but 'writable: true' is missing (set it, or use led_indicator/text_display)");
-            }
-            field.group = requireNode(f, "group", fctx).as<std::string>();
-            blueprint.fields.push_back(std::move(field));
-        }
-        types[typeName] = std::move(blueprint);
+DeviceFieldBlueprint parseDeviceField(const YAML::Node& fieldNode, const std::string& path) {
+    DeviceFieldBlueprint field;
+    field.id = requireNode(fieldNode, "id", path).as<std::string>();
+    field.type = parsePlcType(requireNode(fieldNode, "type", path).as<std::string>(), path + ".type");
+    field.offset = requireNode(fieldNode, "offset", path).as<int>();
+    field.bit = readOptional(fieldNode, "bit", 0);
+    field.label = readOptional(fieldNode, "label", field.id);
+    field.writable = readOptional(fieldNode, "writable", false);
+    field.widget = parseWidgetType(requireNode(fieldNode, "widget", path).as<std::string>(), path + ".widget");
+
+    // `writable` must agree with the widget, so the YAML states explicitly
+    // which fields the GUI is allowed to change.
+    std::string widgetName = widgetTypeName(field.widget);
+    bool widgetIsWritable = isWritableWidget(field.widget);
+    if (field.writable && !widgetIsWritable) {
+        fail(path, "writable: true but widget '" + widgetName +
+                       "' is read-only (use toggle/button/input_number/slider)");
     }
-    return types;
+    if (!field.writable && widgetIsWritable) {
+        fail(path, "widget '" + widgetName +
+                       "' is writable but 'writable: true' is missing "
+                       "(set it, or use led_indicator/text_display)");
+    }
+
+    field.group = requireNode(fieldNode, "group", path).as<std::string>();
+    return field;
+}
+
+std::map<std::string, DeviceTypeBlueprint> parseDeviceTypes(const YAML::Node& root) {
+    std::map<std::string, DeviceTypeBlueprint> deviceTypes;
+    YAML::Node deviceTypesNode = root["device_types"];
+    if (!deviceTypesNode) return deviceTypes;
+
+    for (const auto& entry : deviceTypesNode) {
+        std::string typeName = entry.first.as<std::string>();
+        const YAML::Node& typeNode = entry.second;
+        std::string path = "device_types." + typeName;
+
+        DeviceTypeBlueprint blueprint;
+        blueprint.updateIntervalMs = requireNode(typeNode, "update_interval_ms", path).as<int>();
+        YAML::Node fieldsNode = requireNode(typeNode, "fields", path);
+        for (const auto& fieldNode : fieldsNode) {
+            std::string fieldPath = atIndex(path + ".fields", blueprint.fields.size());
+            blueprint.fields.push_back(parseDeviceField(fieldNode, fieldPath));
+        }
+        deviceTypes[typeName] = std::move(blueprint);
+    }
+    return deviceTypes;
 }
 
 std::vector<DeviceInstance> parseDevices(const YAML::Node& root) {
     std::vector<DeviceInstance> devices;
-    YAML::Node node = root["devices"];
-    if (!node) return devices;
+    YAML::Node devicesNode = root["devices"];
+    if (!devicesNode) return devices;
 
     std::set<std::string> seenIds;
-    int i = 0;
-    for (const auto& item : node) {
-        std::string ctx = "devices[" + std::to_string(i++) + "]";
-        DeviceInstance d;
-        d.type = requireNode(item, "type", ctx).as<std::string>();
-        d.id = requireNode(item, "id", ctx).as<std::string>();
-        d.db = requireNode(item, "db", ctx).as<int>();
-        d.offset = item["offset"] ? item["offset"].as<int>() : 0;
-        d.label = requireNode(item, "label", ctx).as<std::string>();
-        if (!seenIds.insert(d.id).second) {
-            fail(ctx + ".id", "duplicate device id '" + d.id + "' (each device needs a distinct id)");
+    for (const auto& deviceNode : devicesNode) {
+        std::string path = atIndex("devices", devices.size());
+        DeviceInstance device;
+        device.type = requireNode(deviceNode, "type", path).as<std::string>();
+        device.id = requireNode(deviceNode, "id", path).as<std::string>();
+        device.db = requireNode(deviceNode, "db", path).as<int>();
+        device.offset = readOptional(deviceNode, "offset", 0);
+        device.label = requireNode(deviceNode, "label", path).as<std::string>();
+        if (!seenIds.insert(device.id).second) {
+            fail(path + ".id", "duplicate device id '" + device.id + "' (each device needs a distinct id)");
         }
-        devices.push_back(std::move(d));
+        devices.push_back(std::move(device));
     }
     return devices;
 }
 
-void expandDevices(const std::map<std::string, DeviceTypeBlueprint>& deviceTypes,
-                    const std::vector<DeviceInstance>& devices,
-                    AppConfig& cfg) {
-    for (size_t di = 0; di < devices.size(); ++di) {
-        const auto& device = devices[di];
-        std::string ctx = "devices[" + std::to_string(di) + "]";
+// Generates one tag per blueprint field and one panel per device (with the
+// fields' widgets grouped by their `group`, in first-seen order).
+ExpandedDevices expandDevices(const std::map<std::string, DeviceTypeBlueprint>& deviceTypes,
+                              const std::vector<DeviceInstance>& devices) {
+    ExpandedDevices expanded;
+    for (size_t deviceIndex = 0; deviceIndex < devices.size(); ++deviceIndex) {
+        const DeviceInstance& device = devices[deviceIndex];
         auto typeIt = deviceTypes.find(device.type);
         if (typeIt == deviceTypes.end()) {
-            fail(ctx + ".type", "unknown device type '" + device.type + "'");
+            fail(atIndex("devices", deviceIndex) + ".type", "unknown device type '" + device.type + "'");
         }
         const DeviceTypeBlueprint& blueprint = typeIt->second;
 
         PanelConfig panel;
         panel.title = device.label;
-        std::map<std::string, size_t> groupIndexByTitle; // preserves first-seen group order
+        std::map<std::string, size_t> groupIndexByTitle;
 
         for (const auto& field : blueprint.fields) {
             TagConfig tag;
-            tag.id = device.id + "_" + field.id;
+            tag.id = deviceTagId(device.id, field.id);
             tag.db = device.db;
             tag.type = field.type;
             tag.offset = field.offset + device.offset;
@@ -212,7 +294,7 @@ void expandDevices(const std::map<std::string, DeviceTypeBlueprint>& deviceTypes
             tag.updateIntervalMs = blueprint.updateIntervalMs;
             tag.label = field.label;
             tag.device = device.label;
-            cfg.tags.push_back(tag);
+            expanded.tags.push_back(tag);
 
             WidgetConfig widget;
             widget.type = field.widget;
@@ -229,101 +311,82 @@ void expandDevices(const std::map<std::string, DeviceTypeBlueprint>& deviceTypes
             panel.groups[groupIt->second].widgets.push_back(std::move(widget));
         }
 
-        cfg.panels.push_back(std::move(panel));
+        expanded.panels.push_back(std::move(panel));
     }
+    return expanded;
 }
 
-std::vector<PanelConfig> parsePanels(const YAML::Node& root) {
-    std::vector<PanelConfig> panels;
-    YAML::Node node = root["panels"];
-    if (!node) return panels;
-    for (const auto& item : node) {
-        std::string ctx = "panels[" + std::to_string(panels.size()) + "]";
-        PanelConfig p;
-        p.title = requireNode(item, "title", ctx).as<std::string>();
-        p.layout = item["layout"] ? item["layout"].as<std::string>() : std::string("vertical");
-        if (p.layout != "vertical") fail(ctx + ".layout", "unsupported layout '" + p.layout + "' (only 'vertical' is implemented)");
-        if (item["widgets"]) {
-            int i = 0;
-            for (const auto& w : item["widgets"]) {
-                p.widgets.push_back(parseWidget(w, ctx + ".widgets[" + std::to_string(i++) + "]"));
-            }
-        }
-        if (item["groups"]) {
-            int gi = 0;
-            for (const auto& g : item["groups"]) {
-                std::string groupCtx = ctx + ".groups[" + std::to_string(gi++) + "]";
-                WidgetGroupConfig group;
-                group.title = requireNode(g, "title", groupCtx).as<std::string>();
-                if (g["widgets"]) {
-                    int wi = 0;
-                    for (const auto& w : g["widgets"]) {
-                        group.widgets.push_back(parseWidget(w, groupCtx + ".widgets[" + std::to_string(wi++) + "]"));
-                    }
-                }
-                p.groups.push_back(std::move(group));
-            }
-        }
-        panels.push_back(std::move(p));
+LogSinkConfig parseLogSink(const YAML::Node& sinkNode, const std::string& path) {
+    LogSinkConfig sink;
+    sink.id = requireNode(sinkNode, "id", path).as<std::string>();
+    sink.type = parseLogSinkType(requireNode(sinkNode, "type", path).as<std::string>(), path + ".type");
+    sink.table = readOptional(sinkNode, "table", std::string());
+    switch (sink.type) {
+        case LogSinkType::Csv:
+        case LogSinkType::Sqlite:
+            sink.path = requireNode(sinkNode, "path", path).as<std::string>();
+            break;
+        case LogSinkType::InfluxDb:
+            sink.url = requireNode(sinkNode, "url", path).as<std::string>();
+            sink.token = requireNode(sinkNode, "token", path).as<std::string>();
+            sink.org = requireNode(sinkNode, "org", path).as<std::string>();
+            sink.bucket = requireNode(sinkNode, "bucket", path).as<std::string>();
+            sink.measurement = readOptional(sinkNode, "measurement", std::string("plc_readings"));
+            break;
     }
-    return panels;
+    return sink;
+}
+
+LogRuleConfig parseLogRule(const YAML::Node& ruleNode, const std::string& path,
+                           const std::map<std::string, DeviceTypeBlueprint>& deviceTypes,
+                           const std::unordered_map<std::string, const DeviceInstance*>& deviceById) {
+    LogRuleConfig rule;
+    rule.tags = readOptional(ruleNode, "tags", std::vector<std::string>());
+
+    // `devices: [cam1]` is shorthand for every tag generated for cam1.
+    if (ruleNode["devices"]) {
+        for (const auto& deviceIdNode : ruleNode["devices"]) {
+            std::string deviceId = deviceIdNode.as<std::string>();
+            auto deviceIt = deviceById.find(deviceId);
+            if (deviceIt == deviceById.end()) {
+                fail(path + ".devices", "references unknown device '" + deviceId + "'");
+            }
+            const DeviceInstance& device = *deviceIt->second;
+            auto typeIt = deviceTypes.find(device.type);
+            if (typeIt == deviceTypes.end()) {
+                fail(path + ".devices", "device '" + deviceId + "' has unknown type '" + device.type + "'");
+            }
+            for (const auto& field : typeIt->second.fields) {
+                rule.tags.push_back(deviceTagId(deviceId, field.id));
+            }
+        }
+    }
+
+    if (rule.tags.empty()) fail(path, "must specify at least one of 'tags' or 'devices'");
+    rule.intervalMs = requireNode(ruleNode, "interval_ms", path).as<int>();
+    rule.sinks = requireNode(ruleNode, "sinks", path).as<std::vector<std::string>>();
+    return rule;
 }
 
 LoggingConfig parseLogging(const YAML::Node& root,
-                            const std::map<std::string, DeviceTypeBlueprint>& deviceTypes,
-                            const std::vector<DeviceInstance>& devices) {
+                           const std::map<std::string, DeviceTypeBlueprint>& deviceTypes,
+                           const std::vector<DeviceInstance>& devices) {
     LoggingConfig logging;
-    YAML::Node node = requireNode(root, "logging", "root");
+    YAML::Node loggingNode = requireNode(root, "logging", "root");
 
     std::unordered_map<std::string, const DeviceInstance*> deviceById;
-    for (const auto& d : devices) deviceById[d.id] = &d;
+    for (const auto& device : devices) deviceById[device.id] = &device;
 
-    if (node["sinks"]) {
-        for (const auto& item : node["sinks"]) {
-            std::string ctx = "logging.sinks[" + std::to_string(logging.sinks.size()) + "]";
-            LogSinkConfig s;
-            s.id = requireNode(item, "id", ctx).as<std::string>();
-            s.type = requireNode(item, "type", ctx).as<std::string>();
-            if (!kKnownSinkTypes.count(s.type)) fail(ctx + ".type", "unknown sink type '" + s.type + "'");
-            if (s.type == "csv" || s.type == "sqlite") {
-                s.path = requireNode(item, "path", ctx).as<std::string>();
-            }
-            s.table = item["table"] ? item["table"].as<std::string>() : std::string();
-            if (s.type == "influxdb") {
-                s.url = requireNode(item, "url", ctx).as<std::string>();
-                s.token = requireNode(item, "token", ctx).as<std::string>();
-                s.org = requireNode(item, "org", ctx).as<std::string>();
-                s.bucket = requireNode(item, "bucket", ctx).as<std::string>();
-                s.measurement = item["measurement"] ? item["measurement"].as<std::string>() : std::string("plc_readings");
-            }
-            logging.sinks.push_back(std::move(s));
+    if (loggingNode["sinks"]) {
+        for (const auto& sinkNode : loggingNode["sinks"]) {
+            std::string path = atIndex("logging.sinks", logging.sinks.size());
+            logging.sinks.push_back(parseLogSink(sinkNode, path));
         }
     }
-    if (node["rules"]) {
-        for (const auto& item : node["rules"]) {
-            std::string ctx = "logging.rules[" + std::to_string(logging.rules.size()) + "]";
-            LogRuleConfig r;
-            r.tags = item["tags"] ? item["tags"].as<std::vector<std::string>>() : std::vector<std::string>();
-            if (item["devices"]) {
-                for (const auto& devIdNode : item["devices"]) {
-                    std::string deviceId = devIdNode.as<std::string>();
-                    auto devIt = deviceById.find(deviceId);
-                    if (devIt == deviceById.end()) {
-                        fail(ctx + ".devices", "references unknown device '" + deviceId + "'");
-                    }
-                    auto typeIt = deviceTypes.find(devIt->second->type);
-                    if (typeIt == deviceTypes.end()) {
-                        fail(ctx + ".devices", "device '" + deviceId + "' has unknown type '" + devIt->second->type + "'");
-                    }
-                    for (const auto& field : typeIt->second.fields) {
-                        r.tags.push_back(deviceId + "_" + field.id);
-                    }
-                }
-            }
-            if (r.tags.empty()) fail(ctx, "must specify at least one of 'tags' or 'devices'");
-            r.intervalMs = requireNode(item, "interval_ms", ctx).as<int>();
-            r.sinks = requireNode(item, "sinks", ctx).as<std::vector<std::string>>();
-            logging.rules.push_back(std::move(r));
+    if (loggingNode["rules"]) {
+        for (const auto& ruleNode : loggingNode["rules"]) {
+            std::string path = atIndex("logging.rules", logging.rules.size());
+            logging.rules.push_back(parseLogRule(ruleNode, path, deviceTypes, deviceById));
         }
     }
     return logging;
@@ -335,74 +398,74 @@ LoggingConfig parseLogging(const YAML::Node& root,
 // (e.g. "in"/"reset"/"trigger_software" all living in byte 0 of a struct).
 void validateTagLayout(const std::vector<TagConfig>& tags) {
     std::set<std::string> seenIds;
-    for (size_t i = 0; i < tags.size(); ++i) {
-        if (!seenIds.insert(tags[i].id).second) {
-            fail("tags[" + std::to_string(i) + "].id", "duplicate tag id '" + tags[i].id + "'");
+    for (size_t tagIndex = 0; tagIndex < tags.size(); ++tagIndex) {
+        if (!seenIds.insert(tags[tagIndex].id).second) {
+            fail(atIndex("tags", tagIndex) + ".id", "duplicate tag id '" + tags[tagIndex].id + "'");
         }
     }
 
-    std::map<int, std::vector<size_t>> indicesByDb;
-    for (size_t i = 0; i < tags.size(); ++i) indicesByDb[tags[i].db].push_back(i);
+    std::map<int, std::vector<const TagConfig*>> tagsByDb;
+    for (const auto& tag : tags) tagsByDb[tag.db].push_back(&tag);
 
-    for (const auto& [db, indices] : indicesByDb) {
-        for (size_t a = 0; a < indices.size(); ++a) {
-            for (size_t b = a + 1; b < indices.size(); ++b) {
-                const TagConfig& t1 = tags[indices[a]];
-                const TagConfig& t2 = tags[indices[b]];
-                int start1 = t1.offset, end1 = t1.offset + plcTypeByteSize(t1.type);
-                int start2 = t2.offset, end2 = t2.offset + plcTypeByteSize(t2.type);
-                bool overlaps = start1 < end2 && start2 < end1;
+    for (const auto& [db, dbTags] : tagsByDb) {
+        for (size_t a = 0; a < dbTags.size(); ++a) {
+            for (size_t b = a + 1; b < dbTags.size(); ++b) {
+                const TagConfig& first = *dbTags[a];
+                const TagConfig& second = *dbTags[b];
+                int firstEnd = first.offset + plcTypeByteSize(first.type);
+                int secondEnd = second.offset + plcTypeByteSize(second.type);
+                bool overlaps = first.offset < secondEnd && second.offset < firstEnd;
                 if (!overlaps) continue;
 
-                bool bothBoolSameOffsetDifferentBit = t1.type == PlcType::Bool && t2.type == PlcType::Bool &&
-                    t1.offset == t2.offset && t1.bit != t2.bit;
-                if (bothBoolSameOffsetDifferentBit) continue;
+                bool packedBitsInSameByte = first.type == PlcType::Bool && second.type == PlcType::Bool &&
+                                            first.offset == second.offset && first.bit != second.bit;
+                if (packedBitsInSameByte) continue;
 
-                std::ostringstream oss;
-                oss << "tag '" << t1.id << "' (db " << db << ", offset " << t1.offset
-                    << ") overlaps tag '" << t2.id << "' (db " << db << ", offset " << t2.offset << ")";
-                fail("tags", oss.str());
+                fail("tags", "tag '" + first.id + "' (db " + std::to_string(db) + ", offset " +
+                                 std::to_string(first.offset) + ") overlaps tag '" + second.id + "' (db " +
+                                 std::to_string(db) + ", offset " + std::to_string(second.offset) + ")");
             }
         }
     }
 }
 
-void validateReferences(const AppConfig& cfg) {
-    std::set<std::string> tagIds;
-    for (const auto& t : cfg.tags) tagIds.insert(t.id);
-
-    for (size_t pi = 0; pi < cfg.panels.size(); ++pi) {
-        for (size_t wi = 0; wi < cfg.panels[pi].widgets.size(); ++wi) {
-            const auto& w = cfg.panels[pi].widgets[wi];
-            if (!tagIds.count(w.tag)) {
-                fail("panels[" + std::to_string(pi) + "].widgets[" + std::to_string(wi) + "].tag",
-                     "references unknown tag '" + w.tag + "'");
-            }
+void validateWidgetTags(const std::vector<WidgetConfig>& widgets, const std::string& listPath,
+                        const std::set<std::string>& tagIds) {
+    for (size_t widgetIndex = 0; widgetIndex < widgets.size(); ++widgetIndex) {
+        const WidgetConfig& widget = widgets[widgetIndex];
+        if (!tagIds.count(widget.tag)) {
+            fail(atIndex(listPath, widgetIndex) + ".tag", "references unknown tag '" + widget.tag + "'");
         }
-        for (size_t gi = 0; gi < cfg.panels[pi].groups.size(); ++gi) {
-            const auto& group = cfg.panels[pi].groups[gi];
-            for (size_t wi = 0; wi < group.widgets.size(); ++wi) {
-                const auto& w = group.widgets[wi];
-                if (!tagIds.count(w.tag)) {
-                    fail("panels[" + std::to_string(pi) + "].groups[" + std::to_string(gi) +
-                             "].widgets[" + std::to_string(wi) + "].tag",
-                         "references unknown tag '" + w.tag + "'");
-                }
-            }
+    }
+}
+
+// Checks that every widget and logging rule points at a tag that exists,
+// and every logging rule points at a sink that exists.
+void validateReferences(const AppConfig& config) {
+    std::set<std::string> tagIds;
+    for (const auto& tag : config.tags) tagIds.insert(tag.id);
+
+    for (size_t panelIndex = 0; panelIndex < config.panels.size(); ++panelIndex) {
+        const PanelConfig& panel = config.panels[panelIndex];
+        std::string panelPath = atIndex("panels", panelIndex);
+        validateWidgetTags(panel.widgets, panelPath + ".widgets", tagIds);
+        for (size_t groupIndex = 0; groupIndex < panel.groups.size(); ++groupIndex) {
+            std::string groupPath = atIndex(panelPath + ".groups", groupIndex);
+            validateWidgetTags(panel.groups[groupIndex].widgets, groupPath + ".widgets", tagIds);
         }
     }
 
     std::set<std::string> sinkIds;
-    for (const auto& s : cfg.logging.sinks) sinkIds.insert(s.id);
+    for (const auto& sink : config.logging.sinks) sinkIds.insert(sink.id);
 
-    for (size_t ri = 0; ri < cfg.logging.rules.size(); ++ri) {
-        const auto& r = cfg.logging.rules[ri];
-        std::string ctx = "logging.rules[" + std::to_string(ri) + "]";
-        for (const auto& tagId : r.tags) {
-            if (!tagIds.count(tagId)) fail(ctx + ".tags", "references unknown tag '" + tagId + "'");
+    for (size_t ruleIndex = 0; ruleIndex < config.logging.rules.size(); ++ruleIndex) {
+        const LogRuleConfig& rule = config.logging.rules[ruleIndex];
+        std::string rulePath = atIndex("logging.rules", ruleIndex);
+        for (const auto& tagId : rule.tags) {
+            if (!tagIds.count(tagId)) fail(rulePath + ".tags", "references unknown tag '" + tagId + "'");
         }
-        for (const auto& sinkId : r.sinks) {
-            if (!sinkIds.count(sinkId)) fail(ctx + ".sinks", "references unknown sink '" + sinkId + "'");
+        for (const auto& sinkId : rule.sinks) {
+            if (!sinkIds.count(sinkId)) fail(rulePath + ".sinks", "references unknown sink '" + sinkId + "'");
         }
     }
 }
@@ -417,17 +480,19 @@ AppConfig ConfigLoader::load(const std::string& path) {
         throw ConfigError(std::string("failed to parse YAML: ") + e.what());
     }
 
-    AppConfig cfg;
-    cfg.plc = parsePlc(root);
-    cfg.tags = parseTags(root);
-    cfg.panels = parsePanels(root);
+    AppConfig config;
+    config.plc = parsePlc(root);
+    config.tags = parseTags(root);
+    config.panels = parsePanels(root);
 
     auto deviceTypes = parseDeviceTypes(root);
     auto devices = parseDevices(root);
-    expandDevices(deviceTypes, devices, cfg); // appends to cfg.tags / cfg.panels
+    ExpandedDevices expanded = expandDevices(deviceTypes, devices);
+    config.tags.insert(config.tags.end(), expanded.tags.begin(), expanded.tags.end());
+    config.panels.insert(config.panels.end(), expanded.panels.begin(), expanded.panels.end());
 
-    cfg.logging = parseLogging(root, deviceTypes, devices);
-    validateTagLayout(cfg.tags);
-    validateReferences(cfg);
-    return cfg;
+    config.logging = parseLogging(root, deviceTypes, devices);
+    validateTagLayout(config.tags);
+    validateReferences(config);
+    return config;
 }

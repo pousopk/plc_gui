@@ -2,21 +2,13 @@
 #include "plc/plc_io_thread.hpp"
 #include "plc/trend_buffer.hpp"
 #include "support/test_plc_server.hpp"
+#include "support/wait_until.hpp"
 #include <chrono>
 #include <functional>
 #include <memory>
 #include <thread>
 
 namespace {
-
-bool waitUntil(const std::function<bool()>& predicate, int timeoutMs) {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-    while (std::chrono::steady_clock::now() < deadline) {
-        if (predicate()) return true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    return predicate();
-}
 
 TagConfig makeTag(std::string id, int db, PlcType type, int offset, int intervalMs, int bit = 0) {
     TagConfig t;
@@ -62,12 +54,12 @@ TEST_CASE("PlcIoThread reads server values into the cache shortly after starting
 
     bool ok = waitUntil([&] {
         auto snap = cache.snapshot();
-        return snap->count("speed") == 1 && !snap->at("speed").stale;
+        return snap.count("speed") == 1 && !snap.at("speed").stale;
     }, 1000);
     REQUIRE(ok);
 
     auto snap = cache.snapshot();
-    CHECK(std::get<float>(snap->at("speed").value) == doctest::Approx(3.5f));
+    CHECK(std::get<float>(snap.at("speed").value) == doctest::Approx(3.5f));
     CHECK(io.connectionState() == ConnectionState::Connected);
 
     io.stop();
@@ -132,14 +124,14 @@ TEST_CASE("PlcIoThread marks values stale on disconnect and clears staleness on 
 
     REQUIRE(waitUntil([&] {
         auto snap = cache.snapshot();
-        return snap->count("speed") == 1 && !snap->at("speed").stale;
+        return snap.count("speed") == 1 && !snap.at("speed").stale;
     }, 1000));
 
     server.reset(); // simulate the PLC going away
 
     REQUIRE(waitUntil([&] {
         return io.connectionState() == ConnectionState::Reconnecting &&
-               cache.snapshot()->at("speed").stale;
+               cache.snapshot().at("speed").stale;
     }, 1000));
 
     if (!startServerOrSkip(server, 10, 64)) {
@@ -150,10 +142,10 @@ TEST_CASE("PlcIoThread marks values stale on disconnect and clears staleness on 
 
     REQUIRE(waitUntil([&] {
         return io.connectionState() == ConnectionState::Connected &&
-               !cache.snapshot()->at("speed").stale;
+               !cache.snapshot().at("speed").stale;
     }, 1000));
 
-    CHECK(std::get<float>(cache.snapshot()->at("speed").value) == doctest::Approx(2.0f));
+    CHECK(std::get<float>(cache.snapshot().at("speed").value) == doctest::Approx(2.0f));
 
     io.stop();
 }
@@ -187,6 +179,6 @@ TEST_CASE("PlcIoThread works with no trend buffer at all (default nullptr)") {
     PlcIoThread io(fastReconnectConfig(), tags, cache); // unchanged 3-arg call site
     io.start();
 
-    REQUIRE(waitUntil([&] { return cache.snapshot()->count("speed") == 1; }, 1000));
+    REQUIRE(waitUntil([&] { return cache.snapshot().count("speed") == 1; }, 1000));
     io.stop();
 }

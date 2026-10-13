@@ -1,4 +1,5 @@
 #include "ui/app_window.hpp"
+#include "ui/draw_helpers.hpp"
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -18,18 +19,6 @@ void glfwErrorCallback(int error, const char* description) {
 // to fill the remaining space.
 constexpr float kCardMinWidth = 340.0f;
 constexpr float kCardSpacing = 12.0f;
-
-// Draws a small filled circle inline with the following text, matching
-// LedIndicatorWidget's approach (the default ImGui font is ASCII-only, so
-// a Unicode dot glyph would render as a missing-glyph box).
-void drawStatusDot(ImVec4 color, float lineHeight) {
-    float radius = lineHeight * 0.35f;
-    ImVec2 cursor = ImGui::GetCursorScreenPos();
-    ImVec2 center(cursor.x + radius, cursor.y + lineHeight * 0.5f);
-    ImGui::GetWindowDrawList()->AddCircleFilled(center, radius, ImGui::ColorConvertFloat4ToU32(color));
-    ImGui::Dummy(ImVec2(radius * 2.0f + 6.0f, lineHeight));
-    ImGui::SameLine();
-}
 } // namespace
 
 AppWindow::AppWindow(std::string plcName, std::vector<Panel> panels, ValueCache& cache, PlcIoThread& io,
@@ -141,8 +130,7 @@ ImVec4 AppWindow::connectionStateColor(ConnectionState state) {
 
 void AppWindow::renderStatusHeader() {
     ConnectionState state = io_.connectionState();
-    float lineHeight = ImGui::GetTextLineHeightWithSpacing();
-    drawStatusDot(connectionStateColor(state), lineHeight);
+    drawFilledDot(connectionStateColor(state), ImGui::GetTextLineHeightWithSpacing(), 6.0f);
     ImGui::TextColored(connectionStateColor(state), "%s", connectionStateLabel(state));
     ImGui::Separator();
     ImGui::Dummy(ImVec2(0.0f, 4.0f));
@@ -150,8 +138,7 @@ void AppWindow::renderStatusHeader() {
 
 // Renders one device panel as a bordered "card": a title bar, then its
 // ungrouped widgets, then each labeled group (e.g. "Inputs"/"Outputs") as
-// its own sub-section — same widget->render() calls as before, just
-// wrapped in card chrome instead of a flat CollapsingHeader stack.
+// its own sub-section.
 void AppWindow::renderCard(Panel& panel, const ValueMap& snapshot, float cardWidth) {
     ImGui::BeginChild(panel.title.c_str(), ImVec2(cardWidth, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.87f, 1.0f));
@@ -164,10 +151,10 @@ void AppWindow::renderCard(Panel& panel, const ValueMap& snapshot, float cardWid
         widget->render(snapshot, io_);
     }
 
-    for (size_t gi = 0; gi < panel.groups.size(); ++gi) {
-        auto& group = panel.groups[gi];
-        ImGui::PushID(static_cast<int>(gi));
-        if (gi > 0) ImGui::Dummy(ImVec2(0.0f, 6.0f));
+    for (size_t groupIndex = 0; groupIndex < panel.groups.size(); ++groupIndex) {
+        auto& group = panel.groups[groupIndex];
+        ImGui::PushID(static_cast<int>(groupIndex));
+        if (groupIndex > 0) ImGui::Dummy(ImVec2(0.0f, 6.0f));
         ImGui::TextDisabled("%s", group.title.c_str());
         ImGui::Spacing();
         for (auto& widget : group.widgets) {
@@ -183,17 +170,23 @@ void AppWindow::renderCard(Panel& panel, const ValueMap& snapshot, float cardWid
 // stretched to fill the available width, wrapping to the next row.
 void AppWindow::renderPanelGrid(const ValueMap& snapshot) {
     float availWidth = ImGui::GetContentRegionAvail().x;
-    int columns = std::max(1, static_cast<int>((availWidth + kCardSpacing) / (kCardMinWidth + kCardSpacing)));
-    columns = std::min(columns, static_cast<int>(panels_.size()) > 0 ? static_cast<int>(panels_.size()) : 1);
-    float cardWidth = (availWidth - kCardSpacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
 
-    for (size_t pi = 0; pi < panels_.size(); ++pi) {
-        ImGui::PushID(static_cast<int>(pi));
-        renderCard(panels_[pi], snapshot, cardWidth);
+    // How many kCardMinWidth cards (plus spacing) fit across, at least one,
+    // and never more columns than there are panels.
+    int columnsThatFit = static_cast<int>((availWidth + kCardSpacing) / (kCardMinWidth + kCardSpacing));
+    int panelCount = static_cast<int>(panels_.size());
+    int columns = std::max(1, std::min(columnsThatFit, panelCount));
+
+    float totalSpacing = kCardSpacing * static_cast<float>(columns - 1);
+    float cardWidth = (availWidth - totalSpacing) / static_cast<float>(columns);
+
+    for (size_t panelIndex = 0; panelIndex < panels_.size(); ++panelIndex) {
+        ImGui::PushID(static_cast<int>(panelIndex));
+        renderCard(panels_[panelIndex], snapshot, cardWidth);
         ImGui::PopID();
 
-        bool lastInRow = (pi + 1) % static_cast<size_t>(columns) == 0;
-        bool lastPanel = pi + 1 == panels_.size();
+        bool lastInRow = (panelIndex + 1) % static_cast<size_t>(columns) == 0;
+        bool lastPanel = panelIndex + 1 == panels_.size();
         if (!lastPanel && !lastInRow) {
             ImGui::SameLine(0.0f, kCardSpacing);
         }
@@ -205,7 +198,7 @@ void AppWindow::renderFrame() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    auto snap = cache_.snapshot();
+    ValueMap snapshot = cache_.snapshot();
 
     // One window for the whole PLC connection: a status header at the
     // top, then every device panel laid out as a card in a responsive
@@ -217,7 +210,7 @@ void AppWindow::renderFrame() {
 
     if (ImGui::BeginTabBar("MainTabs")) {
         if (ImGui::BeginTabItem("Devices")) {
-            renderPanelGrid(*snap);
+            renderPanelGrid(snapshot);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Trends")) {

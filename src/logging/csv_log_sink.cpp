@@ -22,7 +22,7 @@ void CsvLogSink::open() {
 void CsvLogSink::writeRow(std::chrono::system_clock::time_point ts, const std::vector<LogValue>& values) {
     std::string tsStr = formatTimestamp(ts);
     for (const auto& v : values) {
-        file_ << tsStr << ',' << v.tagId << ',' << formatPlcValue(v.value) << ','
+        file_ << tsStr << ',' << v.tagLabel << ',' << formatPlcValue(v.value) << ','
               << (v.stale ? "true" : "false") << ',' << v.device << '\n';
     }
     if (++bufferedRows_ >= flushEveryNRows_) flush();

@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <sstream>
 #include <stdexcept>
-#include <type_traits>
 
 namespace {
 
@@ -30,7 +29,7 @@ std::string buildInfluxLineProtocol(const std::string& measurement,
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(ts.time_since_epoch()).count();
     std::ostringstream out;
     for (const auto& v : values) {
-        out << measurement << ",tag_id=" << escapeTag(v.tagId);
+        out << measurement << ",tag_id=" << escapeTag(v.tagLabel);
         // A real Influx tag (not a field), so two devices sharing a
         // per-signal label (e.g. two cameras both having a "Finished"
         // signal) land in separate time series instead of colliding.
@@ -41,18 +40,15 @@ std::string buildInfluxLineProtocol(const std::string& measurement,
         // a "value" field — a bool-typed tag and an int-typed tag in the
         // same measurement would collide and one gets silently dropped.
         // Each type gets its own field name instead.
-        std::visit([&out](auto&& val) {
-            using T = std::decay_t<decltype(val)>;
-            if constexpr (std::is_same_v<T, bool>) {
-                out << "value_bool=" << (val ? "true" : "false");
-            } else if constexpr (std::is_same_v<T, int32_t>) {
-                out << "value_int=" << val << "i";
-            } else {
-                char buf[32];
-                std::snprintf(buf, sizeof(buf), "%g", val);
-                out << "value_float=" << buf;
-            }
-        }, v.value);
+        if (std::holds_alternative<bool>(v.value)) {
+            out << "value_bool=" << (std::get<bool>(v.value) ? "true" : "false");
+        } else if (std::holds_alternative<int32_t>(v.value)) {
+            out << "value_int=" << std::get<int32_t>(v.value) << "i"; // "i" suffix = Influx integer
+        } else {
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%g", std::get<float>(v.value));
+            out << "value_float=" << buf;
+        }
         out << ",stale=" << (v.stale ? "true" : "false");
         out << " " << ms << "\n";
     }

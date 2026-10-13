@@ -4,30 +4,26 @@
 #include "plc/value_cache.hpp"
 #include <string>
 
-class IWidget {
+// Base class of every on-screen control. Each widget is bound to a single
+// tag. render() is called once per frame on the UI thread with the latest
+// value snapshot; writable widgets send changes to the PLC through
+// io.requestWrite().
+class Widget {
 public:
-    virtual ~IWidget() = default;
-    virtual void render(const ValueMap& snapshot, PlcIoThread& io) = 0;
-    virtual const std::string& tagId() const = 0;
-};
+    explicit Widget(std::string tagId) : tagId_(std::move(tagId)) {}
+    virtual ~Widget() = default;
 
-class WidgetBase : public IWidget {
-public:
-    explicit WidgetBase(std::string tagId) : tagId_(std::move(tagId)) {}
-    const std::string& tagId() const override { return tagId_; }
+    virtual void render(const ValueMap& snapshot, PlcIoThread& io) = 0;
+    const std::string& tagId() const { return tagId_; }
+
 protected:
     std::string tagId_;
 };
 
-inline std::string getParam(const WidgetConfig& cfg, const std::string& key, const std::string& def) {
+// Returns the widget's YAML param `key`, or `fallback` if it isn't set.
+// Widgets use this for their caption as getParam(cfg, "label",
+// tagDisplayLabel(tag)): a widget's own `label` wins over the tag's.
+inline std::string getParam(const WidgetConfig& cfg, const std::string& key, const std::string& fallback) {
     auto it = cfg.params.find(key);
-    return it != cfg.params.end() ? it->second : def;
-}
-
-// A widget's caption defaults to the tag's own label (if the tag has one)
-// rather than its raw id, so a display name only needs to be set once per
-// tag instead of once per widget. A widget's own `label` param, if present,
-// still wins over both.
-inline std::string defaultLabel(const TagConfig& tag) {
-    return tag.label.empty() ? tag.id : tag.label;
+    return it != cfg.params.end() ? it->second : fallback;
 }

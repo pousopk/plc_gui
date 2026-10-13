@@ -15,3 +15,7 @@ using PlcValue = std::variant<bool, int32_t, float>;
 PlcValue decodePlcValue(PlcType type, const uint8_t* buf, int byteOffset, int bit);
 void encodePlcValue(PlcType type, PlcValue value, uint8_t* buf, int byteOffset, int bit);
 int plcTypeByteSize(PlcType type); // 1 for Bool/USInt, 2 for Int/UInt, 4 for Real/Time
+
+// Numeric form of any value, for charts and printf-style display:
+// bool -> 0.0 / 1.0, integers and floats -> their value.
+double plcValueAsDouble(const PlcValue& value);

@@ -105,6 +105,12 @@ void encodePlcValue(PlcType type, PlcValue value, uint8_t* buf, int byteOffset, 
     }
 }
 
+double plcValueAsDouble(const PlcValue& value) {
+    if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1.0 : 0.0;
+    if (std::holds_alternative<int32_t>(value)) return static_cast<double>(std::get<int32_t>(value));
+    return static_cast<double>(std::get<float>(value));
+}
+
 int plcTypeByteSize(PlcType type) {
     switch (type) {
         case PlcType::Bool:  return 1;

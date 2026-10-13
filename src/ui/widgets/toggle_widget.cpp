@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 ToggleWidget::ToggleWidget(const WidgetConfig& cfg, const TagConfig& tag)
-    : WidgetBase(tag.id), label_(getParam(cfg, "label", defaultLabel(tag))) {}
+    : Widget(tag.id), label_(getParam(cfg, "label", tagDisplayLabel(tag))) {}
 
 void ToggleWidget::render(const ValueMap& snapshot, PlcIoThread& io) {
     auto it = snapshot.find(tagId_);

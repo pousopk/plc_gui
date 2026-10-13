@@ -2,10 +2,15 @@
 #include "config/config_types.hpp"
 #include <vector>
 
-constexpr int kMaxItemsPerBatch = 20; // Snap7 Cli_ReadMultiVars/WriteMultiVars hard item-count cap
-constexpr int kDefaultPduLength = 240; // conservative fallback if the negotiated PDU can't be queried (smallest classic S7 PDU size)
-constexpr int kPduCallOverheadBytes = 20; // reserved for S7 header/parameter framing per call
-constexpr int kPduPerItemOverheadBytes = 12; // conservative per-item overhead (covers both request- and response-side item framing)
+// Snap7's hard cap on items per Cli_ReadMultiVars/WriteMultiVars call.
+constexpr int kMaxItemsPerBatch = 20;
+// Fallback when the negotiated PDU length can't be queried: the smallest
+// classic S7 PDU size, so it is always safe.
+constexpr int kDefaultPduLength = 240;
+// Bytes reserved for the S7 header/parameter framing of each call.
+constexpr int kPduCallOverheadBytes = 20;
+// Conservative per-item overhead (covers request- and response-side framing).
+constexpr int kPduPerItemOverheadBytes = 12;
 
 using PollBatch = std::vector<TagConfig>;
 
