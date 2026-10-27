@@ -1,74 +1,38 @@
 #pragma once
 #include "config/config_types.hpp"
-#include "plc/plc_client.hpp"
-#include "plc/poll_group.hpp"
-#include "plc/trend_buffer.hpp"
 #include "plc/value_cache.hpp"
-#include <atomic>
-#include <chrono>
-#include <mutex>
-#include <thread>
-#include <unordered_map>
+#include <lmlib-profinet/PlcIoThread.hpp>
 #include <vector>
 
-enum class ConnectionState { Disconnected, Connecting, Connected, Reconnecting };
+// The poll/write loop lives in lmlib-profinet; these aliases keep it usable
+// unqualified across the app.
+using profinet::ConnectionState;
+using profinet::PlcIoThread;
 
-// Owns the single Snap7 connection and the background poll/write loop.
-// Not copyable or movable — construct once, call start()/stop() around its
-// lifetime. Safe to call requestWrite()/connectionState() from any thread.
-class PlcIoThread {
-public:
-    PlcIoThread(PlcConnectionConfig plcConfig, std::vector<TagConfig> tags, ValueCache& cache,
-                TrendBuffer* trendBuffer = nullptr);
-    ~PlcIoThread();
-    PlcIoThread(const PlcIoThread&) = delete;
-    PlcIoThread& operator=(const PlcIoThread&) = delete;
+// The app's config structs carry GUI/logging-only fields (name, label,
+// device, ...) that lmlib-profinet doesn't know about; these strip them down
+// to what PlcIoThread needs.
+inline profinet::PlcConnectionConfig toProfinetConnection(const PlcConnectionConfig& plc) {
+    profinet::PlcConnectionConfig out;
+    out.ip = plc.ip;
+    out.rack = plc.rack;
+    out.slot = plc.slot;
+    out.reconnectBackoffMs = plc.reconnectBackoffMs;
+    return out;
+}
 
-    void start();
-    void stop();
-
-    void requestWrite(const std::string& tagId, PlcValue value);
-    ConnectionState connectionState() const;
-
-private:
-    static constexpr int kLoopSleepMs = 10;
-    static constexpr int kFallbackReconnectDelayMs = 1000; // used if reconnect_backoff_ms is empty
-
-    // A poll group plus the next time it should be read.
-    struct ScheduledPollGroup {
-        PollGroup group;
-        std::chrono::steady_clock::time_point nextDue;
-    };
-
-    void run();
-    bool tryConnect();
-    int nextReconnectDelayMs();
-    void handleConnectionLost();
-    void pollGroup(const PollGroup& group);
-    void drainWriteQueue();
-
-    PlcConnectionConfig plcConfig_;
-    std::vector<TagConfig> tags_;
-    std::unordered_map<std::string, TagConfig> tagsById_;
-    std::vector<ScheduledPollGroup> scheduledGroups_;
-    ValueCache& cache_;
-    TrendBuffer* trendBuffer_ = nullptr;
-
-    PlcClient client_;
-    std::atomic<ConnectionState> state_{ConnectionState::Disconnected};
-
-    std::thread thread_;
-    std::atomic<bool> running_{false};
-
-    std::mutex writeQueueMutex_;
-    std::vector<std::pair<std::string, PlcValue>> writeQueue_;
-
-    size_t backoffIndex_ = 0; // only touched by the I/O thread
-    std::chrono::steady_clock::time_point nextConnectAttempt_{};
-
-    // Queried fresh from the PLC on every successful connect (PDU size is
-    // negotiated per-connection); falls back to kDefaultPduLength if the
-    // query fails. Read/write batches are sized against this, never a
-    // fixed item count alone — see buildByteSafeBatches.
-    int pduLength_ = kDefaultPduLength;
-};
+inline std::vector<profinet::TagConfig> toProfinetTags(const std::vector<TagConfig>& tags) {
+    std::vector<profinet::TagConfig> out;
+    out.reserve(tags.size());
+    for (const auto& tag : tags) {
+        profinet::TagConfig t;
+        t.id = tag.id;
+        t.db = tag.db;
+        t.type = tag.type;
+        t.offset = tag.offset;
+        t.bit = tag.bit;
+        t.updateIntervalMs = tag.updateIntervalMs;
+        out.push_back(std::move(t));
+    }
+    return out;
+}

@@ -65,7 +65,9 @@ Application::Application(AppConfig config, bool headless)
 int Application::run() {
     ValueCache cache;
     TrendBuffer trendBuffer;
-    PlcIoThread io(config_.plc, config_.tags, cache, &trendBuffer);
+    PlcIoThread io(toProfinetConnection(config_.plc), toProfinetTags(config_.tags), cache,
+                   [&trendBuffer](const std::string& tagId, std::chrono::system_clock::time_point timestamp,
+                                  const PlcValue& value) { trendBuffer.append(tagId, timestamp, value); });
     LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache, config_.tags);
 
     io.start();

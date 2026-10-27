@@ -65,8 +65,8 @@ add_library(implot STATIC
 target_include_directories(implot PUBLIC ${implot_SOURCE_DIR})
 target_link_libraries(implot PUBLIC imgui)
 
-# --- Snap7 (vendored source, hand-written build — see cmake/snap7.cmake) ---
-include(cmake/snap7.cmake)
+# --- lmlib-profinet (installed package; brings the system Snap7 with it) ---
+find_package(lmlib-profinet 0.6.0 REQUIRED)
 
 # --- SQLite3 (system package) ---
 find_package(SQLite3 REQUIRED)
@@ -77,12 +77,8 @@ find_package(CURL REQUIRED)
 
 set(PLC_GUI_SOURCES
     src/main.cpp
-    src/plc/plc_value.cpp
     src/config/config_loader.cpp
-    src/plc/plc_client.cpp
-    src/plc/poll_group.cpp
     src/plc/trend_buffer.cpp
-    src/plc/plc_io_thread.cpp
     src/logging/csv_log_sink.cpp
     src/logging/sqlite_log_sink.cpp
     src/logging/influx_log_sink.cpp
@@ -105,7 +101,7 @@ target_link_libraries(plc_gui PRIVATE
     yaml-cpp::yaml-cpp
     imgui
     implot
-    snap7_static
+    lmlib-profinet::lmlib-profinet
     SQLite::SQLite3
     CURL::libcurl
     Threads::Threads
@@ -115,9 +111,8 @@ target_include_directories(plc_gui PRIVATE src)
 add_executable(fake_plc_server
     tools/fake_plc_server.cpp
     src/config/config_loader.cpp
-    src/plc/plc_value.cpp
 )
-target_link_libraries(fake_plc_server PRIVATE snap7_static yaml-cpp::yaml-cpp Threads::Threads)
+target_link_libraries(fake_plc_server PRIVATE lmlib-profinet::lmlib-profinet yaml-cpp::yaml-cpp Threads::Threads)
 target_include_directories(fake_plc_server PRIVATE src)
 
 enable_testing()
