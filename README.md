@@ -5,7 +5,7 @@ A Linux desktop application for monitoring and controlling a Siemens PLC over Sn
 ## Features
 
 - **Live device control panels** — sliders, toggles, buttons, numeric inputs, LED indicators, and text displays, one card per device, built at startup from YAML.
-- **Trend charts** — live (in-memory) and historical (SQLite-backed) line/step charts, grouped by device with a per-device select-all toggle.
+- **Trend charts** — live (in-memory) and historical line/step charts, grouped by device with a per-device select-all toggle. Historical charts read only from the first SQLite log sink; CSV logs are never read back.
 - **Multi-sink logging** — CSV and SQLite, independently configurable, all tagged by device so multiple instances of the same device type never collide.
 - **Device blueprint expansion** — define a device type's fields once (`device_types:`), then instantiate it per physical device (`devices:`) with just an id, DB number, and label — no copy-pasted tag/panel/logging blocks.
 - **Headless mode** (`--headless`) — identical polling and logging core, no GUI, suitable for a systemd unit.

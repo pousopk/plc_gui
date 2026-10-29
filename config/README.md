@@ -138,8 +138,21 @@ logging:
 
 | Sink `type` | Required fields | Notes |
 |---|---|---|
-| `csv` | `path` | Appends one row per interval |
+| `csv` | `path` | Appends one row per interval. Write-only: never read back by the app |
 | `sqlite` | `path`, `table` | Also backs the historical Trends chart |
+
+**Historical Trends only read SQLite.** The Trends screen's historical
+ranges (last hour / 24h / 7 days) query the **first** `sqlite` sink in
+`sinks:`; CSV files are never read back. So:
+
+- No `sqlite` sink → the historical view is disabled (Live still works,
+  it reads from memory).
+- A tag only has history if a rule sends it to that first SQLite sink.
+  Tags logged only to CSV, or only to a second SQLite sink, show an
+  empty historical chart.
+- History is only as fine-grained as the rule's `interval_ms`, and the
+  newest rows appear once the sink commits (every 50 log intervals), so
+  it trails the Live view slightly.
 
 A rule needs `interval_ms` and at least one of `tags:` (an explicit list)
 or `devices:` (see step 5) plus `sinks:` — both `tags` and `sinks` entries
