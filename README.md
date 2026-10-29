@@ -6,7 +6,7 @@ A Linux desktop application for monitoring and controlling a Siemens PLC over Sn
 
 - **Live device control panels** — sliders, toggles, buttons, numeric inputs, LED indicators, and text displays, one card per device, built at startup from YAML.
 - **Trend charts** — live (in-memory) and historical (SQLite-backed) line/step charts, grouped by device with a per-device select-all toggle.
-- **Multi-sink logging** — CSV, SQLite, and InfluxDB, independently configurable, all tagged by device so multiple instances of the same device type never collide.
+- **Multi-sink logging** — CSV and SQLite, independently configurable, all tagged by device so multiple instances of the same device type never collide.
 - **Device blueprint expansion** — define a device type's fields once (`device_types:`), then instantiate it per physical device (`devices:`) with just an id, DB number, and label — no copy-pasted tag/panel/logging blocks.
 - **Headless mode** (`--headless`) — identical polling and logging core, no GUI, suitable for a systemd unit.
 - **Config validation** (`--validate-config`) — catches bad YAML, dangling references, duplicate tag ids, overlapping DB byte ranges, and malformed widget params without ever connecting to the PLC.
@@ -27,7 +27,6 @@ flowchart TD
     Cache --> Log
     Log --> CSV[("CSV")]
     Log --> SQLite[("SQLite")]
-    Log --> Influx[("InfluxDB")]
 
     App -->|GUI mode| Window["AppWindow"]
     Window --> Devices["Devices tab\n(PanelFactory + widgets)"]
@@ -46,7 +45,7 @@ flowchart TD
 
 ## Building
 
-Prerequisites (system packages): GLFW3, OpenGL, SQLite3, libcurl, a C++20 compiler, CMake ≥ 3.21. Everything else (Dear ImGui, ImPlot, yaml-cpp, doctest, Snap7) is fetched automatically via CMake's `FetchContent`.
+Prerequisites (system packages): GLFW3, OpenGL, SQLite3, Snap7, [lmlib-profinet](https://github.com/logicmelt/lmlib-profinet) ≥ 0.6.0 (installed so CMake's `find_package` can locate it), a C++20 compiler, CMake ≥ 3.21. Everything else (Dear ImGui, ImPlot, yaml-cpp, doctest) is fetched automatically via CMake's `FetchContent`.
 
 ```bash
 cmake -S . -B build

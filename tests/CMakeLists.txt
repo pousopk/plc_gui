@@ -15,8 +15,6 @@ set(PLC_GUI_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/logging/csv_log_sink.cpp
     logging/sqlite_log_sink_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/sqlite_log_sink.cpp
-    logging/influx_log_sink_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/logging/influx_log_sink.cpp
     logging/log_manager_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/log_manager.cpp
     logging/trend_history_query_test.cpp
@@ -42,7 +40,6 @@ target_link_libraries(plc_gui_tests PRIVATE
     implot
     lmlib-profinet::lmlib-profinet
     SQLite::SQLite3
-    CURL::libcurl
     Threads::Threads
 )
 target_include_directories(plc_gui_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)

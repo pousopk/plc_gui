@@ -1,6 +1,5 @@
 #include "app/application.hpp"
 #include "logging/csv_log_sink.hpp"
-#include "logging/influx_log_sink.hpp"
 #include "logging/log_manager.hpp"
 #include "logging/sqlite_log_sink.hpp"
 #include "logging/trend_history_query.hpp"
@@ -36,10 +35,6 @@ std::unordered_map<std::string, std::shared_ptr<ILogSink>> buildSinks(const Logg
                 break;
             case LogSinkType::Sqlite:
                 sinks[sink.id] = std::make_shared<SqliteLogSink>(sink.path, sink.table);
-                break;
-            case LogSinkType::InfluxDb:
-                sinks[sink.id] = std::make_shared<InfluxLogSink>(sink.url, sink.token, sink.org,
-                                                                 sink.bucket, sink.measurement);
                 break;
         }
     }
