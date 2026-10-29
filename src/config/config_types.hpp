@@ -90,19 +90,14 @@ struct PanelConfig {
     std::vector<WidgetGroupConfig> groups;  // optional labeled sub-sections
 };
 
-// YAML names: "csv", "sqlite", "influxdb".
-enum class LogSinkType { Csv, Sqlite, InfluxDb };
+// YAML names: "csv", "sqlite".
+enum class LogSinkType { Csv, Sqlite };
 
 struct LogSinkConfig {
     std::string id;
     LogSinkType type = LogSinkType::Csv;
     std::string path;  // csv, sqlite
     std::string table; // sqlite only
-    std::string url;         // influxdb only, e.g. "http://localhost:8086"
-    std::string token;       // influxdb only
-    std::string org;         // influxdb only
-    std::string bucket;      // influxdb only
-    std::string measurement; // influxdb only
 };
 
 struct LogRuleConfig {

@@ -61,7 +61,6 @@ WidgetType parseWidgetType(const std::string& name, const std::string& path) {
 LogSinkType parseLogSinkType(const std::string& name, const std::string& path) {
     if (name == "csv") return LogSinkType::Csv;
     if (name == "sqlite") return LogSinkType::Sqlite;
-    if (name == "influxdb") return LogSinkType::InfluxDb;
     fail(path, "unknown sink type '" + name + "'");
 }
 
@@ -321,19 +320,7 @@ LogSinkConfig parseLogSink(const YAML::Node& sinkNode, const std::string& path) 
     sink.id = requireNode(sinkNode, "id", path).as<std::string>();
     sink.type = parseLogSinkType(requireNode(sinkNode, "type", path).as<std::string>(), path + ".type");
     sink.table = readOptional(sinkNode, "table", std::string());
-    switch (sink.type) {
-        case LogSinkType::Csv:
-        case LogSinkType::Sqlite:
-            sink.path = requireNode(sinkNode, "path", path).as<std::string>();
-            break;
-        case LogSinkType::InfluxDb:
-            sink.url = requireNode(sinkNode, "url", path).as<std::string>();
-            sink.token = requireNode(sinkNode, "token", path).as<std::string>();
-            sink.org = requireNode(sinkNode, "org", path).as<std::string>();
-            sink.bucket = requireNode(sinkNode, "bucket", path).as<std::string>();
-            sink.measurement = readOptional(sinkNode, "measurement", std::string("plc_readings"));
-            break;
-    }
+    sink.path = requireNode(sinkNode, "path", path).as<std::string>();
     return sink;
 }
 

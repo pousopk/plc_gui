@@ -7,26 +7,14 @@ FetchContent_MakeAvailable(doctest)
 
 set(PLC_GUI_TEST_SOURCES
     test_main.cpp
-    plc/plc_value_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/plc/plc_value.cpp
     config/config_loader_test.cpp
     ${CMAKE_SOURCE_DIR}/src/config/config_loader.cpp
-    plc/plc_client_test.cpp
-    support/test_plc_server.cpp
-    ${CMAKE_SOURCE_DIR}/src/plc/plc_client.cpp
-    plc/poll_group_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/plc/poll_group.cpp
-    plc/value_cache_test.cpp
     plc/trend_buffer_test.cpp
     ${CMAKE_SOURCE_DIR}/src/plc/trend_buffer.cpp
-    plc/plc_io_thread_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/plc/plc_io_thread.cpp
     logging/csv_log_sink_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/csv_log_sink.cpp
     logging/sqlite_log_sink_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/sqlite_log_sink.cpp
-    logging/influx_log_sink_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/logging/influx_log_sink.cpp
     logging/log_manager_test.cpp
     ${CMAKE_SOURCE_DIR}/src/logging/log_manager.cpp
     logging/trend_history_query_test.cpp
@@ -50,9 +38,8 @@ target_link_libraries(plc_gui_tests PRIVATE
     yaml-cpp::yaml-cpp
     imgui
     implot
-    snap7_static
+    lmlib-profinet::lmlib-profinet
     SQLite::SQLite3
-    CURL::libcurl
     Threads::Threads
 )
 target_include_directories(plc_gui_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)

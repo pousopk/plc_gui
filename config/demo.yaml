@@ -122,15 +122,6 @@ logging:
     - { id: csv_demo,   type: csv,    path: "logs/demo.csv" }
     - { id: csv_fast,   type: csv,    path: "logs/demo_fast.csv" }
     - { id: sqlite_demo, type: sqlite, path: "logs/demo.db", table: "demo_readings" }
-    # InfluxDB works the same way. Uncomment if you have a server running.
-    # The token is stored in this file as plain text, so don't commit a real one.
-    # - id: influx_demo
-    #   type: influxdb
-    #   url: "http://localhost:8086"
-    #   token: "my-token"
-    #   org: "my-org"
-    #   bucket: "plc_demo"
-    #   measurement: "plc_readings"   # optional, this is the default
 
   rules:
     # An explicit tag list, sent to two sinks every second.
@@ -148,6 +139,3 @@ logging:
     - tags: [mixer_speed]
       interval_ms: 200
       sinks: [csv_fast]
-    # - devices: [conv1, conv2, conv3]
-    #   interval_ms: 1000
-    #   sinks: [influx_demo]

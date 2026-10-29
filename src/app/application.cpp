@@ -1,6 +1,5 @@
 #include "app/application.hpp"
 #include "logging/csv_log_sink.hpp"
-#include "logging/influx_log_sink.hpp"
 #include "logging/log_manager.hpp"
 #include "logging/sqlite_log_sink.hpp"
 #include "logging/trend_history_query.hpp"
@@ -37,10 +36,6 @@ std::unordered_map<std::string, std::shared_ptr<ILogSink>> buildSinks(const Logg
             case LogSinkType::Sqlite:
                 sinks[sink.id] = std::make_shared<SqliteLogSink>(sink.path, sink.table);
                 break;
-            case LogSinkType::InfluxDb:
-                sinks[sink.id] = std::make_shared<InfluxLogSink>(sink.url, sink.token, sink.org,
-                                                                 sink.bucket, sink.measurement);
-                break;
         }
     }
     return sinks;
@@ -65,7 +60,9 @@ Application::Application(AppConfig config, bool headless)
 int Application::run() {
     ValueCache cache;
     TrendBuffer trendBuffer;
-    PlcIoThread io(config_.plc, config_.tags, cache, &trendBuffer);
+    PlcIoThread io(toProfinetConnection(config_.plc), toProfinetTags(config_.tags), cache,
+                   [&trendBuffer](const std::string& tagId, std::chrono::system_clock::time_point timestamp,
+                                  const PlcValue& value) { trendBuffer.append(tagId, timestamp, value); });
     LogManager logManager(config_.logging.rules, buildSinks(config_.logging), cache, config_.tags);
 
     io.start();

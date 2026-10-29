@@ -186,59 +186,6 @@ logging: { sinks: [], rules: [] }
     std::remove(path.c_str());
 }
 
-TEST_CASE("ConfigLoader parses an influxdb sink with all its fields") {
-    auto path = writeTempYaml(R"YAML(
-plc: { ip: "1.2.3.4" }
-tags:
-  - { id: t1, db: 1, type: int, offset: 0, update_interval_ms: 100 }
-panels: []
-logging:
-  sinks:
-    - id: influx_main
-      type: influxdb
-      url: "http://localhost:8086"
-      token: "my-token"
-      org: "my-org"
-      bucket: "my-bucket"
-      measurement: "plc_readings"
-  rules:
-    - tags: [t1]
-      interval_ms: 500
-      sinks: [influx_main]
-)YAML");
-    AppConfig cfg = ConfigLoader::load(path);
-    REQUIRE(cfg.logging.sinks.size() == 1);
-    const auto& s = cfg.logging.sinks[0];
-    CHECK(s.type == LogSinkType::InfluxDb);
-    CHECK(s.url == "http://localhost:8086");
-    CHECK(s.token == "my-token");
-    CHECK(s.org == "my-org");
-    CHECK(s.bucket == "my-bucket");
-    CHECK(s.measurement == "plc_readings");
-    std::remove(path.c_str());
-}
-
-TEST_CASE("ConfigLoader defaults influxdb measurement to plc_readings when omitted") {
-    auto path = writeTempYaml(R"YAML(
-plc: { ip: "1.2.3.4" }
-tags: []
-panels: []
-logging:
-  sinks:
-    - id: influx_main
-      type: influxdb
-      url: "http://localhost:8086"
-      token: "my-token"
-      org: "my-org"
-      bucket: "my-bucket"
-  rules: []
-)YAML");
-    AppConfig cfg = ConfigLoader::load(path);
-    REQUIRE(cfg.logging.sinks.size() == 1);
-    CHECK(cfg.logging.sinks[0].measurement == "plc_readings");
-    std::remove(path.c_str());
-}
-
 TEST_CASE("ConfigLoader parses panel groups, nesting widgets inside") {
     auto path = writeTempYaml(R"YAML(
 plc: { ip: "1.2.3.4" }
@@ -299,6 +246,20 @@ panels:
     widgets:
       - { type: bogus_widget, tag: t1 }
 logging: { sinks: [], rules: [] }
+)");
+    CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
+    std::remove(path.c_str());
+}
+
+TEST_CASE("ConfigLoader rejects an unknown sink type") {
+    auto path = writeTempYaml(R"(
+plc: { ip: "1.2.3.4" }
+tags: []
+panels: []
+logging:
+  sinks:
+    - { id: influx_main, type: influxdb, url: "http://localhost:8086" }
+  rules: []
 )");
     CHECK_THROWS_AS(ConfigLoader::load(path), ConfigError);
     std::remove(path.c_str());

@@ -12,3 +12,6 @@ logs/
 
 # ImGui's auto-saved window layout (per-machine runtime state)
 imgui.ini
+
+# Claude planning docs (specs/plans) -- local only, never committed
+docs/superpowers/

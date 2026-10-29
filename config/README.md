@@ -60,8 +60,9 @@ tags:
 | `time` | 4 | Signed millisecond count, needs even byte alignment in the DB |
 
 Optional per tag: `label` (display name — defaults to `id`), `device`
-(groups tags from the same physical device so logging sinks like InfluxDB
-don't collide two devices' identically-named tags into one series).
+(groups tags from the same physical device, and is written alongside each
+value by the logging sinks so two devices' identically-named tags stay
+distinguishable).
 
 **Getting offsets right:** in TIA Portal, the DB's "Optimized block access"
 property must be **unchecked** — optimized DBs have no fixed byte layout,
@@ -137,21 +138,28 @@ logging:
 
 | Sink `type` | Required fields | Notes |
 |---|---|---|
-| `csv` | `path` | Appends one row per interval |
+| `csv` | `path` | Appends one row per interval. Write-only: never read back by the app |
 | `sqlite` | `path`, `table` | Also backs the historical Trends chart |
-| `influxdb` | `url`, `token`, `org`, `bucket` | `measurement` optional (default `"plc_readings"`) |
+
+**Historical Trends only read SQLite.** The Trends screen's historical
+ranges (last hour / 24h / 7 days) query the **first** `sqlite` sink in
+`sinks:`; CSV files are never read back. So:
+
+- No `sqlite` sink → the historical view is disabled (Live still works,
+  it reads from memory).
+- A tag only has history if a rule sends it to that first SQLite sink.
+  Tags logged only to CSV, or only to a second SQLite sink, show an
+  empty historical chart.
+- History is only as fine-grained as the rule's `interval_ms`, and the
+  newest rows appear once the sink commits (every 50 log intervals), so
+  it trails the Live view slightly.
 
 A rule needs `interval_ms` and at least one of `tags:` (an explicit list)
 or `devices:` (see step 5) plus `sinks:` — both `tags` and `sinks` entries
 must reference things defined earlier, or validation fails. You can add
 the same tag to multiple rules at different intervals/sinks; sinks are
-independent of each other, so having CSV + SQLite + InfluxDB all active
-costs nothing but disk space.
-
-⚠️ **`influxdb.token` is a plaintext secret in the YAML file.** Don't commit
-a real token to a shared repo — keep production tokens in a config file
-that's gitignored, or rely on a fresh/scoped token you're fine treating as
-disposable.
+independent of each other, so having CSV + SQLite both active costs
+nothing but disk space.
 
 ## 5. Repeated devices — `device_types:` / `devices:`
 
@@ -222,5 +230,5 @@ rule's `devices:` list — no repeated tag/panel/widget blocks.
 ## Full minimal example
 
 See [`plc.yaml`](plc.yaml) for steps 1–4 combined into one small runnable
-config, and [`camera_inspection.yaml`](camera_inspection.yaml) for the
-`device_types:`/`devices:` pattern from step 5 in a real config.
+config, and [`demo.yaml`](demo.yaml) for the `device_types:`/`devices:`
+pattern from step 5 alongside every other feature.

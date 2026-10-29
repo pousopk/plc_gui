@@ -14,7 +14,7 @@
 // actually works.
 #include "config/config_loader.hpp"
 #include "plc/plc_value.hpp"
-#include <snap7.h>
+#include <lmlib-profinet/snap7.h>
 #include <atomic>
 #include <chrono>
 #include <cmath>
